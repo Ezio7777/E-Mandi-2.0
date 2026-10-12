@@ -4,6 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 
+from app.agents.fraud_risk.events import emit_risk_event
 from app.core.dependencies import (
     CurrentUser, RequestContextDep, SessionDep, get_job_queue, get_url_resolver, require_roles,
 )
@@ -58,8 +59,11 @@ Limit = Annotated[int, Query(ge=1, le=50)]
 
 
 @router.post("", response_model=Envelope[ListingOut], status_code=201, dependencies=[Farmer])
-async def create_listing(body: ListingCreate, user: CurrentUser, svc: Svc, ctx: RequestContextDep):
-    return Envelope(data=await svc.to_out(await svc.create(user, body, ctx)))
+async def create_listing(body: ListingCreate, user: CurrentUser, svc: Svc, ctx: RequestContextDep, session: SessionDep,
+                         queue: Annotated[JobQueue, Depends(get_job_queue)]):
+    listing = await svc.create(user, body, ctx)
+    await emit_risk_event(session, queue, "listing.created", listing.id, idempotency_key=f"risk:listing.created:{listing.id}")
+    return Envelope(data=await svc.to_out(listing))
 
 
 @router.get("", response_model=Envelope[ListingPage])
@@ -79,13 +83,18 @@ async def get_listing(listing_id: uuid.UUID, user: CurrentUser, svc: Svc):
 
 @router.patch("/{listing_id}", response_model=Envelope[ListingOut], dependencies=[Farmer])
 async def update_listing(listing_id: uuid.UUID, body: ListingUpdate, user: CurrentUser, svc: Svc,
-                         ctx: RequestContextDep):
-    return Envelope(data=await svc.to_out(await svc.update(user, listing_id, body, ctx)))
+                         ctx: RequestContextDep, session: SessionDep, queue: Annotated[JobQueue, Depends(get_job_queue)]):
+    listing = await svc.update(user, listing_id, body, ctx)
+    await emit_risk_event(session, queue, "listing.updated", listing.id)
+    return Envelope(data=await svc.to_out(listing))
 
 
 @router.post("/{listing_id}/submit", response_model=Envelope[ListingOut], dependencies=[Farmer])
-async def submit_listing(listing_id: uuid.UUID, user: CurrentUser, svc: Svc, ctx: RequestContextDep):
-    return Envelope(data=await svc.to_out(await svc.submit(user, listing_id, ctx)))
+async def submit_listing(listing_id: uuid.UUID, user: CurrentUser, svc: Svc, ctx: RequestContextDep, session: SessionDep,
+                         queue: Annotated[JobQueue, Depends(get_job_queue)]):
+    listing = await svc.submit(user, listing_id, ctx)
+    await emit_risk_event(session, queue, "listing.submitted", listing.id, idempotency_key=f"risk:listing.submitted:{listing.id}")
+    return Envelope(data=await svc.to_out(listing))
 
 
 @router.post("/{listing_id}/archive", response_model=Envelope[ListingOut],

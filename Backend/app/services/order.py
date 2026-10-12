@@ -238,23 +238,37 @@ class OrderService:
         return True
 
     async def mark_paid(self, order_id: uuid.UUID) -> str:
-        """PAYMENT_PENDING -> PAID and COMMIT the sale (reserved stock becomes sold).
-        Returns 'paid' | 'already_paid' | 'late' (order was cancelled/expired: caller must refund)."""
+        """Standalone wrapper: locks the order and applies payment in its own transaction."""
         async with transactional(self.session):
             o = await self.orders.get_for_update(order_id)
             if o is None:
                 raise NotFoundError("Order not found")
-            if o.status == OrderStatus.PAID:
-                return "already_paid"
-            if o.status != OrderStatus.PAYMENT_PENDING:
-                return "late"
-            await self.inventory.commit_sale_many(self._release_payload(o))
-            self._transition(o, OrderStatus.PAID, SYSTEM_ACTOR, total_amount_paise=o.total_amount_paise)
-            o.reservation_expires_at = None
-            self.notify.add(o.farmer_id, NotificationType.PAYMENT_SUCCESSFUL, "Payment received",
-                            f"Order {str(o.id)[:8]} has been paid (Rs {paise_to_rupees(o.total_amount_paise)}).", {"order_id": str(o.id)})
-            self.notify.add(o.buyer_id, NotificationType.PAYMENT_SUCCESSFUL, "Payment successful",
-                            f"Your payment of Rs {paise_to_rupees(o.total_amount_paise)} was received.", {"order_id": str(o.id)})
+            return await self.apply_paid_locked(o)
+
+    async def apply_refunded_locked(self, o: Order) -> bool:
+        """DISPUTED/CANCELLED -> REFUNDED. Caller holds the order lock and the surrounding transaction."""
+        if o.status not in {OrderStatus.DISPUTED, OrderStatus.CANCELLED}:
+            return False
+        self._transition(o, OrderStatus.REFUNDED, SYSTEM_ACTOR)
+        return True
+
+    async def apply_paid_locked(self, o: Order) -> str:
+        """PAYMENT_PENDING (or RESERVED, if the provider confirmed before we marked it pending) -> PAID and COMMIT the sale.
+        Caller holds the order lock + transaction, so payment, order and inventory change atomically.
+        Returns 'paid' | 'already_paid' | 'late' (order cancelled/expired: caller must refund)."""
+        if o.status == OrderStatus.PAID:
+            return "already_paid"
+        if o.status == OrderStatus.RESERVED:  # webhook raced ahead of mark_payment_pending
+            self._transition(o, OrderStatus.PAYMENT_PENDING, SYSTEM_ACTOR)
+        if o.status != OrderStatus.PAYMENT_PENDING:
+            return "late"
+        await self.inventory.commit_sale_many(self._release_payload(o))
+        self._transition(o, OrderStatus.PAID, SYSTEM_ACTOR, total_amount_paise=o.total_amount_paise)
+        o.reservation_expires_at = None
+        self.notify.add(o.farmer_id, NotificationType.PAYMENT_SUCCESSFUL, "Payment received",
+                        f"Order {str(o.id)[:8]} has been paid (Rs {paise_to_rupees(o.total_amount_paise)}).", {"order_id": str(o.id)})
+        self.notify.add(o.buyer_id, NotificationType.PAYMENT_SUCCESSFUL, "Payment successful",
+                        f"Your payment of Rs {paise_to_rupees(o.total_amount_paise)} was received.", {"order_id": str(o.id)})
         return "paid"
 
     # ------------------------------------------------------------------ recovery sweeper

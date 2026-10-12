@@ -54,3 +54,27 @@ def haversine_km(a: GeoPoint, b: GeoPoint) -> float:
     dphi, dl = p2 - p1, math.radians(b.lon - a.lon)
     h = math.sin(dphi / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
     return 2 * 6371.0088 * math.asin(math.sqrt(h))
+
+
+# Native-script / common spellings for spoken queries (voice). Additive: used only by find_city_in_text.
+_NATIVE = {"बेंगलुरु": "bengaluru", "बैंगलोर": "bengaluru", "बेंगलोर": "bengaluru", "ಬೆಂಗಳೂರು": "bengaluru", "ಬೆಂಗಳೂರ": "bengaluru",
+           "मैसूर": "mysuru", "ಮೈಸೂರು": "mysuru", "हुबली": "hubballi", "ಹುಬ್ಬಳ್ಳಿ": "hubballi", "बेलगाम": "belagavi",
+           "ಬೆಳಗಾವಿ": "belagavi", "मंगलोर": "mangaluru", "ಮಂಗಳೂರು": "mangaluru", "ತುಮಕೂರು": "tumakuru", "ಹಾಸನ": "hassan",
+           "कोलार": "kolar", "ಕೋಲಾರ": "kolar", "मुंबई": "mumbai", "दिल्ली": "delhi", "पुणे": "pune", "चेन्नई": "chennai",
+           "हैदराबाद": "hyderabad", "नाशिक": "nashik", "कोलकाता": "kolkata", "जयपुर": "jaipur", "लखनऊ": "lucknow",
+           "इंदौर": "indore", "नागपुर": "nagpur", "ದಾವಣಗೆರೆ": "davanagere", "ಮಂಡ್ಯ": "mandya", "ಶಿವಮೊಗ್ಗ": "shivamogga"}
+
+
+def find_city_in_text(text: str) -> str | None:
+    """First gazetteer city mentioned in free text (English names/aliases, Devanagari or Kannada script). Canonical key."""
+    import re
+    t = normalize_text(text)
+    forms = {**_NATIVE, **{a[:-2]: c for a, c in _NATIVE.items() if a.endswith("\u0cc1") and len(a) > 5}}  # Kannada: ಮೈಸೂರು -> ಮೈಸೂರಿನಲ್ಲಿ
+    for alias, canon in sorted(forms.items(), key=lambda kv: -len(kv[0])):
+        if alias in t:  # native scripts inflect ('बेंगलुरु में'), so substring match
+            return canon
+    names = sorted({*_CITIES, *_ALIASES}, key=len, reverse=True)
+    for n in names:
+        if re.search(rf"(?<![\w]){re.escape(n)}(?![\w])", t):
+            return _ALIASES.get(n, n)
+    return None

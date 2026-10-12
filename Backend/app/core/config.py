@@ -65,6 +65,9 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: SecretStr = SecretStr("")
     OPENAI_VISION_MODEL: str = ""
     OPENAI_TRANSCRIPTION_MODEL: str = ""
+    GEMINI_TRANSCRIPTION_MODEL: str = ""
+    OPENAI_TTS_MODEL: str = ""  # optional spoken answers; empty = text-only
+    OPENAI_TTS_VOICE: str = ""
     OPENAI_TEXT_MODEL: str = ""
     GRADING_CONFIDENCE_THRESHOLD: float = 0.75
     AI_PROVIDER_TIMEOUT_SECONDS: float = 30.0
@@ -77,6 +80,48 @@ class Settings(BaseSettings):
     PAYMENT_KEY_SECRET: SecretStr = SecretStr("")
     PAYMENT_WEBHOOK_SECRET: SecretStr = SecretStr("")
     RESERVATION_TTL_MINUTES: int = 30
+
+    # Disputes / live notifications
+    DISPUTE_WINDOW_DAYS: int = 7  # after COMPLETED
+    SSE_POLL_SECONDS: float = 3.0
+    SSE_MAX_SECONDS: int = 300  # clients reconnect (Last-Event-ID) so connections are bounded
+    SSE_MAX_CONNECTIONS_PER_USER: int = 3
+
+    # Voice assistant (audio is processed in memory and never stored; transcripts live only in the short Redis session)
+    VOICE_MAX_AUDIO_BYTES: int = 5 * 1024 * 1024
+    VOICE_MAX_TEXT_CHARS: int = 500
+    VOICE_SESSION_TTL_SECONDS: int = 1800
+    VOICE_SESSION_MAX_TURNS: int = 6
+    VOICE_TOOL_TIMEOUT_SECONDS: float = 10.0
+    VOICE_TTS_MAX_CHARS: int = 600
+
+    # Agent observability
+    AGENT_STUCK_MINUTES: int = 15  # QUEUED/RUNNING longer than this is reported as stuck in the Agent Control Center
+    ANALYTICS_CACHE_SECONDS: int = 300
+
+    # Recovery sweepers (Stage 18)
+    RECOVERY_QUEUED_AFTER_MINUTES: int = 5      # QUEUED execution older than this had its enqueue lost
+    RECOVERY_RUNNING_AFTER_MINUTES: int = 30    # RUNNING execution older than this is presumed crashed
+    RECOVERY_ANALYZING_AFTER_MINUTES: int = 30  # listing stuck in ANALYZING with no in-flight grading run
+    RECOVERY_MAX_ATTEMPTS: int = 3              # re-enqueues per execution/listing before it is failed / routed to review
+    RECOVERY_WEBHOOK_AFTER_SECONDS: int = 120   # stored-but-unprocessed payment events are re-applied after this
+    RECOVERY_APPROVED_ACTION_MINUTES: int = 5   # PendingAction stuck APPROVED (crash before execution)
+    RECOVERY_BATCH: int = 100
+    RECOVERY_REMATCH_DAYS: int = 14
+    ORPHAN_S3_AFTER_HOURS: int = 24
+    ORPHAN_S3_MAX_DELETES: int = 200
+
+    # Fraud & Risk Agent: deterministic rule thresholds. A rule firing means FLAGGED_FOR_REVIEW, never a verdict.
+    RISK_PRICE_DEVIATION_MEDIUM_PCT: int = 50   # listing price vs market reference
+    RISK_PRICE_DEVIATION_HIGH_PCT: int = 80
+    RISK_LARGE_LOT_KG: int = 50000
+    RISK_LISTING_EDITS_PER_HOUR: int = 5
+    RISK_PAYMENT_FAILURES_24H: int = 3          # >= this: MEDIUM; >= this + 2: HIGH
+    RISK_ORDERS_PER_HOUR: int = 10
+    RISK_NEW_ACCOUNT_HOURS: int = 24
+    RISK_NEW_ACCOUNT_ORDER_PAISE: int = 10_000_000  # Rs 1,00,000
+    RISK_LOW_CONFIDENCE_FLAG: float = 0.5       # grading confidence below this is also a LOW signal
+    RISK_PROPOSE_BAN_ON_HIGH: bool = False      # if true, a HIGH signal on a user queues a BAN_USER request for admin approval
 
     # Buyer matching: search scope expansion (km; 0 = same city, -1 = anywhere) and result cap
     MATCH_RADIUS_STEPS_KM: str = "0,50,150,400,-1"

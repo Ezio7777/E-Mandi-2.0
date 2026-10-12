@@ -153,3 +153,33 @@ def get_embedding_provider(request: Request, settings: SettingsDep) -> Embedding
         p = build_embedding_provider(settings)
         request.app.state.embedder = p
     return p
+
+
+# ---------------------------------------------------------------------------------------------
+# Payment provider dependency (Stage 13)
+# ---------------------------------------------------------------------------------------------
+from app.integrations.payments.base import PaymentProvider  # noqa: E402
+from app.integrations.payments.mock import MockPaymentProvider  # noqa: E402
+from app.integrations.payments.razorpay import RazorpayProvider  # noqa: E402
+
+
+def get_payment_provider(request: Request, settings: SettingsDep) -> PaymentProvider:
+    p = getattr(request.app.state, "payment_provider", None)
+    if p is None:
+        p = RazorpayProvider(settings) if settings.PAYMENT_PROVIDER == "razorpay" else MockPaymentProvider(settings)
+        request.app.state.payment_provider = p
+    return p
+
+
+# ---------------------------------------------------------------------------------------------
+# Voice providers dependency (Stage 15)
+# ---------------------------------------------------------------------------------------------
+from app.services.voice import VoiceProviders, build_voice_providers  # noqa: E402
+
+
+def get_voice_providers(request: Request, settings: SettingsDep) -> VoiceProviders:
+    p = getattr(request.app.state, "voice_providers", None)
+    if p is None:
+        p = build_voice_providers(settings)
+        request.app.state.voice_providers = p
+    return p

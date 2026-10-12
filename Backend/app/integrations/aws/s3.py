@@ -1,6 +1,7 @@
 """Object storage abstraction. S3 is the permanent store; Postgres only holds keys + metadata."""
 import asyncio
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Protocol
 
 import boto3
@@ -33,6 +34,7 @@ class ObjectStorage(Protocol):
     async def head(self, key: str) -> ObjectHead | None: ...
     async def get_bytes(self, key: str, max_bytes: int) -> bytes: ...
     async def delete(self, key: str) -> None: ...
+    async def list_keys(self, prefix: str, limit: int) -> list[tuple[str, datetime]]: ...
 
 
 class S3Storage:
@@ -48,7 +50,7 @@ class S3Storage:
             client = boto3.client("s3", **kw)
         self.client = client
 
-    async def _run(self, fn, *a, **kw):  # noqa: ANN001, ANN002, ANN003, ANN202
+    async def _run(self, fn, *a, **kw):
         try:
             return await asyncio.to_thread(fn, *a, **kw)
         except ClientError as exc:
@@ -91,3 +93,15 @@ class S3Storage:
             await self._run(self.client.delete_object, Bucket=self.bucket, Key=key)
         except ProviderError:
             log.warning("s3_delete_failed", key=key)  # best-effort; orphan sweeper cleans up
+
+    async def list_keys(self, prefix: str, limit: int) -> list[tuple[str, datetime]]:
+        """(key, last_modified) for up to `limit` objects under prefix (used by the orphan sweeper)."""
+        def _list() -> list[tuple[str, datetime]]:
+            out: list[tuple[str, datetime]] = []
+            for page in self.client.get_paginator("list_objects_v2").paginate(Bucket=self.bucket, Prefix=prefix):
+                for o in page.get("Contents", []):
+                    out.append((o["Key"], o["LastModified"]))
+                    if len(out) >= limit:
+                        return out
+            return out
+        return await self._run(_list)

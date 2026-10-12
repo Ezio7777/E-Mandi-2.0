@@ -260,13 +260,13 @@ async def run_grading_job(app_ctx, lid, eid, graders, queue, job_try=1):
 async def test_grading_event_triggers_pricing_and_tracks_executions(app_ctx, client, db):
     await seed_market(db)
     h, fid, lid = await analyzing_listing(app_ctx, client, db)
-    _, (_, geid) = app_ctx.state.fake_queue.jobs[0]
+    _, (_, geid) = next(j for j in app_ctx.state.fake_queue.jobs if j[0] == "grade_listing_job")
     q = RecordingJobQueue()
     await run_grading_job(app_ctx, lid, geid, [G("gemini", raw())], q)
     gex = await db.get(AgentExecution, uuid.UUID(geid), populate_existing=True)
     assert (gex.status, gex.provider, gex.fallback_used, gex.attempt) == (AgentStatus.COMPLETED, "gemini", False, 1)
     assert "grade A" in gex.summary and gex.tool_calls[0]["tool"] == "vision_grade"
-    (name, args), = q.jobs  # grading.completed -> exactly one pricing job
+    (name, args), = [j for j in q.jobs if j[0] != "assess_risk_job"]  # grading.completed -> exactly one pricing job
     res = (await db.scalars(select(__import__("app.models.crop_grading_result", fromlist=["x"]).CropGradingResult))).one()
     assert name == "price_listing_job" and args[:2] == (str(lid), str(res.id))
     pex = await db.get(AgentExecution, uuid.UUID(args[2]), populate_existing=True)
@@ -278,12 +278,12 @@ async def test_grading_event_triggers_pricing_and_tracks_executions(app_ctx, cli
     # a replayed grading event creates no second pricing execution
     await dispatch(db, q, agent=AgentName.SMART_PRICING, job_name="price_listing_job", trigger_type="grading.completed",
                    entity_type="listing", entity_id=lid, job_args=(str(lid), str(res.id)), idempotency_key=f"pricing:{res.id}")
-    assert len(q.jobs) == 1
+    assert len([j for j in q.jobs if j[0] != "assess_risk_job"]) == 1
 
 
 async def test_grading_execution_status_mapping(app_ctx, client, db):
     _, _, lid = await analyzing_listing(app_ctx, client, db)
-    _, (_, eid) = app_ctx.state.fake_queue.jobs[0]
+    _, (_, eid) = next(j for j in app_ctx.state.fake_queue.jobs if j[0] == "grade_listing_job")
     q = RecordingJobQueue()
     with pytest.raises(Retry):  # providers down, attempt 1 => retry scheduled, execution back to QUEUED
         await run_grading_job(app_ctx, lid, eid, [G("gemini", error="timeout")], q)
@@ -292,12 +292,12 @@ async def test_grading_execution_status_mapping(app_ctx, client, db):
     await run_grading_job(app_ctx, lid, eid, [G("gemini", raw(confidence=0.3))], q, job_try=2)  # low confidence
     ex = await db.get(AgentExecution, uuid.UUID(eid), populate_existing=True)
     assert (ex.status, ex.attempt, ex.error_code) == (AgentStatus.REVIEW_REQUIRED, 2, None)
-    assert len(q.jobs) == 1  # pricing still runs on a result that needs review (admin sees the suggestion)
+    assert len([j for j in q.jobs if j[0] != "assess_risk_job"]) == 1  # pricing still runs on a result that needs review (admin sees the suggestion)
 
 
 async def test_grading_final_outage_marks_review_required_without_pricing(app_ctx, client, db):
     _, _, lid = await analyzing_listing(app_ctx, client, db)
-    _, (_, eid) = app_ctx.state.fake_queue.jobs[0]
+    _, (_, eid) = next(j for j in app_ctx.state.fake_queue.jobs if j[0] == "grade_listing_job")
     q = RecordingJobQueue()
     await run_grading_job(app_ctx, lid, eid, [G("gemini", error="timeout"), G("openai", error="timeout")], q, job_try=3)
     ex = await db.get(AgentExecution, uuid.UUID(eid), populate_existing=True)

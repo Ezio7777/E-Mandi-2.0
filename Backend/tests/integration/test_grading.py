@@ -74,7 +74,7 @@ async def refresh(db, lid):
 
 async def test_submit_enqueues_job_after_commit(app_ctx, client, db):
     _, _, lid = await analyzing_listing(app_ctx, client, db)
-    (name, args), = app_ctx.state.fake_queue.jobs
+    (name, args), = [j for j in app_ctx.state.fake_queue.jobs if j[0] != "assess_risk_job"]  # (risk events are asserted in test_risk.py)
     assert name == "grade_listing_job" and args[0] == str(lid) and len(args) == 2
     ex = await db.get(AgentExecution, uuid.UUID(args[1]))  # the execution id is the frontend jobId
     assert (ex.agent_name, ex.status, ex.related_entity_id) == (AgentName.CROP_GRADING, AgentStatus.QUEUED, str(lid))

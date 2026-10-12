@@ -5,6 +5,7 @@ from typing import Any
 
 from arq import Retry
 
+from app.agents.fraud_risk.events import emit_risk_event
 from app.agents.runtime import AgentOutcome, dispatch, run_tracked
 from app.core.config import get_settings
 from app.core.database import get_sessionmaker
@@ -51,3 +52,4 @@ async def grade_listing_job(ctx: dict[str, Any], listing_id: str, execution_id: 
             await dispatch(session, queue, agent=AgentName.SMART_PRICING, job_name="price_listing_job",
                            trigger_type="grading.completed", entity_type="listing", entity_id=listing_id,
                            job_args=(listing_id, str(res.id)), idempotency_key=f"pricing:{res.id}")
+            await emit_risk_event(session, queue, "grading.completed", listing_id, idempotency_key=f"risk:grading.completed:{res.id}")

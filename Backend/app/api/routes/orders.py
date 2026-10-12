@@ -3,7 +3,9 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, Query, Response
 
-from app.core.dependencies import CurrentUser, RequestContextDep, SessionDep, SettingsDep, require_roles
+from app.agents.fraud_risk.events import emit_risk_event
+from app.core.dependencies import CurrentUser, RequestContextDep, SessionDep, SettingsDep, get_job_queue, require_roles
+from app.workers.queue import JobQueue
 from app.core.rate_limit import rate_limit
 from app.models.enums import OrderStatus, UserRole
 from app.schemas.common import Envelope
@@ -25,13 +27,15 @@ Svc = Annotated[OrderService, Depends(get_order_service)]
 
 @router.post("", response_model=Envelope[OrderOut], status_code=201,
              dependencies=[Buyer, Depends(rate_limit("order_create", 20, 60, per_user=True))])
-async def create_order(body: OrderCreate, user: CurrentUser, svc: Svc, ctx: RequestContextDep, response: Response,
-                       idempotency_key: IdemKey = None):
+async def create_order(body: OrderCreate, user: CurrentUser, svc: Svc, ctx: RequestContextDep, response: Response, session: SessionDep,
+                       queue: Annotated[JobQueue, Depends(get_job_queue)], idempotency_key: IdemKey = None):
     """Send an Idempotency-Key header (any unique string per checkout attempt) so retries/double-clicks never double-order."""
     order, created = await svc.create(user, body, idempotency_key, ctx)
     if not created:
         response.status_code = 200
         response.headers["Idempotency-Replayed"] = "true"
+    else:
+        await emit_risk_event(session, queue, "order.created", order.id, idempotency_key=f"risk:order.created:{order.id}")
     return Envelope(data=to_out(order))
 
 

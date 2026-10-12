@@ -13,7 +13,8 @@ from sqlalchemy import text
 import app.models  # noqa: F401
 from app.core.config import get_settings
 from app.core.database import dispose_engine, get_engine, get_sessionmaker
-from app.core.dependencies import get_google_verifier, get_job_queue, get_otp_sender, get_storage
+from app.core.dependencies import get_google_verifier, get_job_queue, get_otp_sender, get_payment_provider, get_storage
+from app.integrations.payments.mock import MockPaymentProvider
 from app.workers.queue import RecordingJobQueue
 from app.core.errors import UnauthorizedError
 from app.integrations.aws.s3 import ObjectHead, PresignedPost
@@ -64,6 +65,7 @@ class FakeStorage:
 
     def __init__(self) -> None:
         self.objects: dict[str, bytes] = {}
+        self.modified: dict[str, object] = {}
 
     def put(self, key: str, data: bytes) -> None:
         self.objects[key] = data
@@ -86,6 +88,10 @@ class FakeStorage:
     async def delete(self, key):  # noqa: ANN001, ANN201
         self.objects.pop(key, None)
 
+    async def list_keys(self, prefix, limit):  # noqa: ANN001, ANN201
+        from datetime import UTC, datetime
+        return [(k, self.modified.get(k, datetime.now(UTC))) for k in sorted(self.objects) if k.startswith(prefix)][:limit]
+
 
 @pytest_asyncio.fixture
 async def redis() -> AsyncIterator[Redis]:
@@ -107,6 +113,9 @@ async def app_ctx(redis):
     app.dependency_overrides[get_google_verifier] = lambda: google
     app.dependency_overrides[get_otp_sender] = lambda: otp
     storage, queue = FakeStorage(), RecordingJobQueue()
+    provider = MockPaymentProvider(get_settings())
+    app.dependency_overrides[get_payment_provider] = lambda: provider
+    app.state.fake_provider = provider
     app.dependency_overrides[get_job_queue] = lambda: queue
     app.state.fake_queue = queue
     app.dependency_overrides[get_storage] = lambda: storage
