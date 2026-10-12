@@ -1,3 +1,4 @@
+import { env } from "@/config/env";
 import { api } from "./client";
 import type { ImageDto, UploadInitDto } from "@/types";
 
@@ -16,6 +17,7 @@ export function uploadToS3(
   onProgress: (pct: number) => void,
   signal?: AbortSignal,
 ): Promise<void> {
+  if (env.demoMode) return simulateUpload(onProgress, signal);
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     const isPost = Boolean(init.fields);
@@ -33,5 +35,18 @@ export function uploadToS3(
     } else {
       xhr.send(file);
     }
+  });
+}
+
+/** Demo mode has no bucket: animate realistic progress instead of hitting the network. */
+function simulateUpload(onProgress: (pct: number) => void, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let pct = 0;
+    const id = setInterval(() => {
+      pct = Math.min(100, pct + 12 + Math.round(Math.random() * 10));
+      onProgress(pct);
+      if (pct >= 100) { clearInterval(id); resolve(); }
+    }, 70);
+    signal?.addEventListener("abort", () => { clearInterval(id); reject(new DOMException("Aborted", "AbortError")); });
   });
 }

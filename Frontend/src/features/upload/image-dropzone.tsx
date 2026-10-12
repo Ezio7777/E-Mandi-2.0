@@ -16,7 +16,7 @@ export function ImageDropzone({ upload }: { upload: Upload }) {
   const full = upload.items.length >= MAX_IMAGES;
 
   return (
-    <div className="space-y-4" data-tour="upload-zone">
+    <div className="space-y-4" data-tour="upload-zone" data-upload-ready={upload.ready ? "true" : "false"}>
       <div
         onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
         onDragLeave={() => setDrag(false)}

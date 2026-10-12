@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,17 +11,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ErrorState } from "@/components/feedback/error-state";
 import { ImageDropzone } from "@/features/upload/image-dropzone";
+import { SAMPLE_CROPS } from "@/features/upload/sample-crops";
 import { useImageUpload } from "@/features/upload/use-image-upload";
 import { GradeCard, GradingProgress } from "@/features/grading/grade-card";
 import { PriceCard } from "@/features/pricing/price-card";
 import { useGradingJob, usePriceSuggestion, useStartGrading } from "@/services/grading";
 import { useCreateListing } from "@/services/listings";
-import { useAppDispatch } from "@/store/hooks";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { wizardDraftChanged } from "@/store/slices/ui.slice";
 import { toastPushed } from "@/store/slices/notifications.slice";
 import { formatKg, formatPerKg, formatINR } from "@/utils/format";
 import { useT } from "@/lib/i18n";
 import { cropSchema, locationSchema, priceSchema, quantitySchema } from "./sell.schema";
+
+/** What the guided tour fills in when it drives the wizard. */
+const DEMO = { crop: "Tomato", qty: 800, loc: "Hosur, Tamil Nadu" } as const;
 
 const TITLE_KEYS = ["wizard.step0", "wizard.step1", "wizard.step2", "wizard.step3", "wizard.step4", "wizard.step5", "wizard.step6", "wizard.step7"] as const;
 
@@ -30,7 +34,12 @@ function TextStep<S extends z.ZodTypeAny>({ schema, name, label, hint, type = "t
   defaultValue?: string | number; onValid: (v: Record<string, unknown>) => void;
 }) {
   const { t } = useT();
-  const { register, handleSubmit, formState: { errors } } = useForm<Record<string, unknown>>({ resolver: zodResolver(schema), defaultValues: { [name]: defaultValue } });
+  const { register, handleSubmit, setValue, getValues, formState: { errors } } = useForm<Record<string, unknown>>({ resolver: zodResolver(schema), defaultValues: { [name]: defaultValue } });
+  // A default that arrives after the step is shown (e.g. the AI price suggestion) fills an untouched field.
+  useEffect(() => {
+    const cur = getValues(name);
+    if (defaultValue !== undefined && (cur === undefined || cur === "")) setValue(name, defaultValue);
+  }, [defaultValue, name, getValues, setValue]);
   const err = errors[name]?.message as string | undefined;
   return (
     <form onSubmit={handleSubmit(onValid)} className="space-y-4" noValidate>
@@ -72,6 +81,46 @@ export function SellWizard() {
   };
   const gradingDone = job.data?.status === "ready" && result;
   const back = () => setStep((s) => Math.max(0, s - 1));
+
+  /* ---- Guided-tour driver: the tour asks for a step, the wizard gets there with demo data. ---- */
+  const goal = useAppSelector((s) => s.tour.wizardGoal);
+  const { reset: resetUpload, addSample, ready: uploadReady, keys: uploadKeys, items: uploadItems } = upload;
+  const { reset: resetStart, mutate: startGrading } = start;
+  const drove = useRef(false);
+  const sampleAsked = useRef(false);
+  const gradingAsked = useRef(false);
+  const graded = Boolean(gradingDone);
+
+  const resetAll = useCallback(() => {
+    setStep(0); setCrop(""); setQty(0); setLoc(""); setPrice(null); setJobId(null);
+    sampleAsked.current = false; gradingAsked.current = false;
+    resetUpload(); resetStart();
+  }, [resetUpload, resetStart]);
+
+  useEffect(() => {
+    if (!goal) {
+      if (drove.current) { drove.current = false; resetAll(); } // tour ended or moved off the wizard: clean slate
+      return;
+    }
+    drove.current = true;
+    if (uploadItems.length === 0) {
+      if (!sampleAsked.current) { sampleAsked.current = true; void addSample(SAMPLE_CROPS[0]); }
+      return;
+    }
+    if (!uploadReady) return;
+    if (goal.goal === 0) { if (step !== 0) setStep(0); return; }
+    if (jobId === null) {
+      if (!gradingAsked.current) {
+        gradingAsked.current = true;
+        setCrop(DEMO.crop); setQty(DEMO.qty); setLoc(DEMO.loc); setStep(4);
+        startGrading({ imageKeys: uploadKeys, cropName: DEMO.crop }, { onSuccess: (r) => setJobId(r.jobId) });
+      }
+      return;
+    }
+    if (goal.goal >= 5 && !graded) return;
+    if (goal.goal >= 6 && price === null) return;
+    if (step !== goal.goal) setStep(goal.goal);
+  }, [goal, uploadItems.length, uploadReady, uploadKeys, jobId, graded, price, step, addSample, startGrading, resetAll]);
 
   if (published) {
     return (
@@ -131,7 +180,7 @@ export function SellWizard() {
 
         {step === 6 && result && price !== null && (
           <div className="space-y-4">
-            <dl className="divide-y rounded-lg border text-sm">
+            <dl className="divide-y rounded-lg border text-sm" data-tour="review-card">
               {[["Crop", crop], ["Quantity", formatKg(qty)], ["Location", loc], ["AI grade", `${result.grade} (${Math.round(result.confidence * 100)}% confidence)`], ["Your price", formatPerKg(price)], ["Estimated value", formatINR(qty * price)], ["Photos", String(upload.keys.length)]].map(([k, v]) => (
                 <div key={k} className="flex justify-between gap-4 px-4 py-3"><dt className="text-muted-foreground">{k}</dt><dd className="text-right font-medium">{v}</dd></div>
               ))}

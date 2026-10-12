@@ -102,8 +102,16 @@ export function useImageUpload() {
     void send(id, file);
   }, [patch, send]);
 
+  /** Drop every photo and abort anything in flight. */
+  const reset = useCallback(() => {
+    aborts.current.forEach((c) => c.abort());
+    aborts.current.clear();
+    commit([]);
+    setErrors([]);
+  }, [commit]);
+
   return {
-    items, errors, addFiles, addSample, remove, retry, replace,
+    items, errors, addFiles, addSample, remove, retry, replace, reset,
     ready: items.length > 0 && items.every((i) => i.status === "done"),
     keys: items.flatMap((i) => (i.objectKey ? [i.objectKey] : [])),
   };

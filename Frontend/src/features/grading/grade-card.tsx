@@ -3,7 +3,7 @@ import { AlertTriangle, CheckCircle2, Clock, Cpu } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useT } from "@/lib/i18n";
-import { formatDate, formatPercent } from "@/utils/format";
+import { formatDate, formatNumber, formatPercent } from "@/utils/format";
 import { cn } from "@/utils/cn";
 import type { GradingJobDto } from "@/types";
 
@@ -33,7 +33,7 @@ export function GradingProgress({ job }: { job?: GradingJobDto }) {
 export function GradeCard({ result }: { result: NonNullable<GradingJobDto["result"]> }) {
   const { t } = useT();
   return (
-    <Card className="p-5" data-tour="grading-card">
+    <Card className="p-5" data-tour="grade-result">
       <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
         <div>
           <p className="text-sm text-muted-foreground">{t("grading.grade")}</p>
@@ -41,7 +41,7 @@ export function GradeCard({ result }: { result: NonNullable<GradingJobDto["resul
         </div>
         <div className="grid grid-cols-2 gap-x-6 gap-y-1 pb-1 text-sm">
           <div><p className="text-muted-foreground">{t("grading.confidence")}</p><p className="text-lg font-semibold">{formatPercent(result.confidence)}</p></div>
-          <div><p className="text-muted-foreground">{t("grading.defects")}</p><p className="text-lg font-semibold">{result.defectPercent}%</p></div>
+          <div><p className="text-muted-foreground">{t("grading.defects")}</p><p className="text-lg font-semibold">{formatNumber(result.defectPercent)}%</p></div>
         </div>
       </div>
 

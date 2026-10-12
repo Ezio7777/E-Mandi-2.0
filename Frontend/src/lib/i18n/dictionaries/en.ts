@@ -23,7 +23,7 @@ const enRaw = {
   farmer: {
     sellTitle: "Sell a crop", step: "Step", of: "of", publish: "Publish listing", trySample: "Try with sample crop",
   },
-  grading: { grade: "Grade", confidence: "confidence", defects: "Defects", manualReview: "Manual review recommended" },
+  grading: { grade: "Grade", confidence: "Confidence", defects: "Defects", manualReview: "Manual review recommended" },
   voice: {
     listening: "Listening…", transcribing: "Transcribing…", searching: "Searching market data…",
     generating: "Generating answer…", tapToSpeak: "Tap to speak",

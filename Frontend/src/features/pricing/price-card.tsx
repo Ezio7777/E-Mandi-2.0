@@ -18,7 +18,7 @@ export function PriceCard({ crop, grade, location }: { crop: string; grade?: Gra
   const span = Math.max(p.rangeMax - p.rangeMin, 1);
   const pos = Math.min(100, Math.max(0, ((p.suggested - p.rangeMin) / span) * 100));
   return (
-    <Card className="p-5" data-tour="price-card">
+    <Card className="p-5" data-tour="price-card" data-price-ready="true">
       <p className="text-sm text-muted-foreground">Suggested price</p>
       <p className="font-display text-4xl font-bold">{formatPerKg(p.suggested)}</p>
       <div className="mt-4">

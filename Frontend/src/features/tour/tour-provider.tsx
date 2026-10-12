@@ -7,10 +7,10 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/cn";
 import { ROLE_PREFIX } from "@/config/routes";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { stepChanged, tourAck, tourCompleted, tourReset, tourSkipped } from "@/store/slices/tour.slice";
+import { driveSet, stepChanged, tourAck, tourCompleted, tourReset, tourSkipped } from "@/store/slices/tour.slice";
 import type { Role } from "@/types";
 import { placeCard, type Box } from "./tour-layout";
-import { TOURS } from "./tour-steps";
+import { tourSteps } from "./tour-steps";
 
 const PAD = 8;
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -87,7 +87,7 @@ function TourOverlay() {
   const cardX = useMotionValue(0);
   const cardY = useMotionValue(0);
 
-  const steps = activeTour ? TOURS[activeTour] : [];
+  const steps = activeTour ? tourSteps(activeTour) : [];
   const step = steps[stepIndex];
   const last = stepIndex === steps.length - 1;
 
@@ -175,30 +175,64 @@ function TourOverlay() {
         await pause(80); // let the new page paint
       }
 
+      // Tell the page underneath what this step needs (wizard position, demo form values).
+      dispatch(driveSet({ wizardGoal: step.wizard ? { goal: step.wizard.goal, sample: Boolean(step.wizard.sample) } : null, fill: step.fill ?? null }));
+
+      /** Scroll a target into view, wait for it to stop moving, and move the spotlight onto it. */
+      const focusOn = async (target: HTMLElement | null) => {
+        let rect: Box | null = null;
+        if (target) {
+          ensureVisible(target, reduce);
+          await settle(target, stop);
+          if (cancelled) return null;
+          rect = toBox(target.getBoundingClientRect());
+        }
+        targetRef.current = target;
+        setHasTarget(Boolean(target));
+        settledRef.current = false;
+        const first = !layerShown.current;
+        layerShown.current = true;
+        setLayerOn(true);
+        lastRect.current = rect;
+        const landed = spotlightTo(rect, first).then(() => { if (!cancelled) settledRef.current = true; });
+        return { rect, landed };
+      };
+
+      // Find the target. Steps that depend on slow data (AI grading) spotlight a loading placeholder
+      // as soon as it exists, then keep waiting for the real thing.
       let el: HTMLElement | null = null;
+      let landed: Promise<void> | null = null;
+      let rect: Box | null = null;
       if (step.target) {
         const t0 = performance.now();
-        // Page already on screen: a missing target will not appear, so fall back quickly.
-        // After a route change or first start, data may still be loading: wait longer.
+        const patient = Boolean(step.waitMs);
+        const maxWait = step.waitMs ?? 4000;
         const fallbackAfter = step.fallbackTarget ? (wantsRoute || !layerShown.current ? 2200 : 300) : Infinity;
-        while (!cancelled && performance.now() - t0 < 4000) {
-          const waited = performance.now() - t0;
-          el = findVisible(step.target) ?? (waited > fallbackAfter ? findVisible(step.fallbackTarget) : null);
+        let interim: HTMLElement | null = null;
+        while (!cancelled && performance.now() - t0 < maxWait) {
+          el = findVisible(step.target);
           if (el) break;
-          await sleep(50);
+          if (patient) {
+            const fb = findVisible(step.fallbackTarget);
+            if (fb && fb !== interim) {
+              interim = fb;
+              const f = await focusOn(fb);
+              if (!f || cancelled) return;
+            }
+          } else if (performance.now() - t0 > fallbackAfter) {
+            el = findVisible(step.fallbackTarget);
+            if (el) break;
+          }
+          await sleep(60);
         }
+        if (cancelled) return;
+        if (!el) el = interim ?? findVisible(step.fallbackTarget);
       }
       if (cancelled) return;
-      targetRef.current = el;
-      setHasTarget(Boolean(el));
 
-      let rect: Box | null = null;
-      if (el) {
-        ensureVisible(el, reduce);
-        await settle(el, stop);
-        if (cancelled) return;
-        rect = toBox(el.getBoundingClientRect());
-      }
+      // Content that must finish loading first (e.g. the price card's data).
+      if (step.ready) await until(() => Boolean(document.querySelector(step.ready!)), step.waitMs ?? 6000, stop);
+      if (cancelled) return;
 
       // Swap the card's content while it is invisible, then measure it.
       setShown({ tour: activeTour, index: stepIndex });
@@ -206,12 +240,10 @@ function TourOverlay() {
       if (cancelled) return;
 
       // Background first...
-      settledRef.current = false;
-      const first = !layerShown.current;
-      layerShown.current = true;
-      setLayerOn(true);
-      lastRect.current = rect;
-      const landed = spotlightTo(rect, first).then(() => { if (!cancelled) settledRef.current = true; });
+      const f = await focusOn(el);
+      if (!f || cancelled) return;
+      landed = f.landed;
+      rect = f.rect;
 
       // ...then the card, once the background has landed (bounded so it can never stall).
       await Promise.race([landed, pause(600)]);
@@ -267,7 +299,7 @@ function TourOverlay() {
   if (!mounted) return null;
 
   const tourRole = shown?.tour ?? activeTour;
-  const list = tourRole ? TOURS[tourRole] : [];
+  const list = tourRole ? tourSteps(tourRole) : [];
   const index = shown?.index ?? stepIndex;
   const view = list[index];
   const isLast = index === list.length - 1;

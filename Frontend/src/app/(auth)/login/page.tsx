@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { LoginForms } from "@/features/auth/login-forms";
 import { GoogleButton } from "@/features/auth/google-button";
 import { DemoButtons } from "@/features/demo/demo-buttons";
+import { DemoModeNote } from "@/features/demo/demo-mode-note";
 
 export const metadata: Metadata = { title: "Log in" };
 
@@ -20,6 +21,7 @@ export default function LoginPage() {
           <span className="relative bg-card px-3">Just looking around?</span>
         </div>
         <DemoButtons layout="stack" />
+        <DemoModeNote />
       </CardContent>
     </Card>
   );

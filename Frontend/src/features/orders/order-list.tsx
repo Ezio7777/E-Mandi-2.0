@@ -19,7 +19,7 @@ export function OrderList({ role }: { role: Role }) {
     <QueryBoundary query={q} skeleton={<ListSkeleton />} isEmpty={(d) => d.length === 0}
       empty={<EmptyState icon={ShoppingBasket} title={t("empty.ordersTitle")} description={role === "buyer" ? t("empty.ordersBuyer") : t("empty.ordersFarmer")} />}>
       {(orders) => (
-        <ResponsiveTable caption="Orders" rows={orders} rowKey={(o) => o.id}
+        <ResponsiveTable tourId="orders-list" caption="Orders" rows={orders} rowKey={(o) => o.id}
           columns={[
             { key: "crop", header: t("labels.crop"), primary: true, cell: (o) => <Link href={`/${role}/orders/${o.id}`} className="font-medium text-primary hover:underline">{o.listing.crop} · {formatKg(o.quantityKg)}</Link> },
             { key: "party", header: role === "buyer" ? t("labels.farmer") : t("labels.buyer"), cell: (o) => (role === "buyer" ? o.farmerName : o.buyerName) },

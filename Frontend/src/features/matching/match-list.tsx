@@ -13,7 +13,7 @@ export function MatchList({ requirementId, poll = false }: { requirementId?: str
   return (
     <QueryBoundary query={q} skeleton={<ListSkeleton rows={3} />} isEmpty={(d) => d.length === 0}
       empty={<EmptyState icon={Target} title={t("empty.matchesTitle")} description={t("empty.matchesBody")} />}>
-      {(ms) => <div className="space-y-4">{[...ms].sort((a, b) => b.score - a.score).map((m, i) => <MatchCard key={m.listingId} match={m} rank={i + 1} />)}</div>}
+      {(ms) => <div className="space-y-4">{[...ms].sort((a, b) => b.score - a.score).map((m, i) => <div key={m.listingId} data-tour={i === 0 ? "match-card" : undefined}><MatchCard match={m} rank={i + 1} /></div>)}</div>}
     </QueryBoundary>
   );
 }

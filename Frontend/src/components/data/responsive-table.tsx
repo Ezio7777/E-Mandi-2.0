@@ -14,14 +14,16 @@ interface Props<T> {
   rows: T[];
   rowKey: (row: T) => string;
   caption: string;
+  /** data-tour marker, applied to whichever of table / card list is visible */
+  tourId?: string;
 }
 
 /** Real table from md up; stacked label/value cards below md. No horizontal scroll on phones. */
-export function ResponsiveTable<T>({ columns, rows, rowKey, caption }: Props<T>) {
+export function ResponsiveTable<T>({ columns, rows, rowKey, caption, tourId }: Props<T>) {
   const primary = columns.find((c) => c.primary) ?? columns[0]!;
   return (
     <>
-      <div className="hidden overflow-x-auto rounded-lg border md:block">
+      <div className="hidden overflow-x-auto rounded-lg border md:block" data-tour={tourId}>
         <table className="w-full text-sm">
           <caption className="sr-only">{caption}</caption>
           <thead className="bg-muted/60 text-left text-muted-foreground">
@@ -36,7 +38,7 @@ export function ResponsiveTable<T>({ columns, rows, rowKey, caption }: Props<T>)
           </tbody>
         </table>
       </div>
-      <ul className="space-y-3 md:hidden">
+      <ul className="space-y-3 md:hidden" data-tour={tourId}>
         {rows.map((r) => (
           <li key={rowKey(r)} className="rounded-lg border bg-card p-4">
             <div className="font-medium">{primary.cell(r)}</div>

@@ -26,7 +26,7 @@ function load(): Persisted | undefined {
     if (!raw) return undefined;
     const saved = JSON.parse(raw) as Persisted;
     // A running tour is never restored: avoids a stale overlay after reload.
-    if (saved.tour) saved.tour = { ...saved.tour, activeTour: null, stepIndex: 0, celebrate: false };
+    if (saved.tour) saved.tour = { ...saved.tour, activeTour: null, stepIndex: 0, celebrate: false, wizardGoal: null, fill: null };
     return saved;
   } catch {
     return undefined;
@@ -56,7 +56,7 @@ export function rehydrateFromStorage(store: AppStore): () => void {
   return store.subscribe(() => {
     const { theme, tour, demo } = store.getState();
     try {
-      window.localStorage.setItem(PERSIST_KEY, JSON.stringify({ theme, tour: { ...tour, activeTour: null, stepIndex: 0, celebrate: false }, demo }));
+      window.localStorage.setItem(PERSIST_KEY, JSON.stringify({ theme, tour: { ...tour, activeTour: null, stepIndex: 0, celebrate: false, wizardGoal: null, fill: null }, demo }));
     } catch {
       /* storage unavailable */
     }

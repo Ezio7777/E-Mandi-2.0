@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
@@ -9,13 +9,27 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { useCreateRequirement } from "@/services/orders";
+import { useAppSelector } from "@/store/hooks";
 import { MatchList } from "./match-list";
 import { requirementSchema, type RequirementValues } from "./requirement.schema";
 
 export function RequirementForm() {
   const create = useCreateRequirement();
   const [createdId, setCreatedId] = useState<string | null>(null);
-  const { register, handleSubmit, formState: { errors } } = useForm<RequirementValues>({ resolver: zodResolver(requirementSchema), defaultValues: { desiredGrade: "A" } });
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<RequirementValues>({ resolver: zodResolver(requirementSchema), defaultValues: { desiredGrade: "A" } });
+
+  // Guided tour: fill with a realistic requirement, and clear it again when the tour moves on or ends.
+  const fill = useAppSelector((s) => s.tour.fill);
+  const filled = useRef(false);
+  useEffect(() => {
+    if (fill === "requirement") {
+      filled.current = true;
+      reset({ crop: "Tomato", quantityKg: 500, desiredGrade: "A", destination: "Bangalore", deliveryDate: new Date(Date.now() + 86_400_000).toISOString().slice(0, 10), maxBudget: 20000 });
+    } else if (filled.current) {
+      filled.current = false;
+      reset({ desiredGrade: "A" });
+    }
+  }, [fill, reset]);
   const E = ({ n }: { n: keyof RequirementValues }) => (errors[n] ? <p role="alert" className="text-sm text-danger">{errors[n]?.message as string}</p> : null);
 
   if (createdId) {

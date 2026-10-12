@@ -20,7 +20,22 @@ function buildUrl(path: string, query?: Query) {
   return url.toString();
 }
 
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/** Demo mode: same contract, answered in the browser (code-split, only loaded when needed). */
+async function demoRequest<T>(path: string, opts: RequestOptions): Promise<T> {
+  await sleep(120 + Math.random() * 180); // realistic latency so loading states are visible
+  const { handleDemoRequest } = await import("@/lib/demo/handler");
+  try {
+    return (await handleDemoRequest(opts.method ?? "GET", path, opts.query, opts.body)) as T;
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 401) onUnauthorized?.();
+    throw e;
+  }
+}
+
 export async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
+  if (env.demoMode) return demoRequest<T>(path, opts);
   const { query, body, headers, ...rest } = opts;
   const isForm = typeof FormData !== "undefined" && body instanceof FormData;
   let res: Response;

@@ -30,7 +30,7 @@ export function CheckoutPanel({ order }: { order: OrderDto }) {
   const busy = initiate.isPending || confirm.isPending;
 
   return (
-    <Card className="space-y-4 p-5">
+    <Card className="space-y-4 p-5" data-tour="checkout-panel">
       <div className="flex items-center justify-between gap-2">
         <h2 className="font-display text-lg font-semibold">Payment</h2>
         <PaymentStatusBadge status={current} />

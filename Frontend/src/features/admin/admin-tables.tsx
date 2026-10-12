@@ -82,7 +82,7 @@ export function AuditLogTable() {
   const { t } = useT();
   const q = useAdminAuditLogs();
   return <QueryBoundary query={q} skeleton={<ListSkeleton />} isEmpty={(d) => !d.length} empty={<EmptyState icon={ScrollText} title={t("empty.auditTitle")} description={t("empty.auditBody")} />}>{(rows) => (
-    <ResponsiveTable caption="Audit log" rows={rows} rowKey={(l) => l.id} columns={[
+    <ResponsiveTable tourId="audit-table" caption="Audit log" rows={rows} rowKey={(l) => l.id} columns={[
       { key: "a", header: t("labels.action"), primary: true, cell: (l) => l.action },
       { key: "w", header: t("labels.actor"), cell: (l) => l.actor },
       { key: "e", header: t("labels.entity"), cell: (l) => l.entity },

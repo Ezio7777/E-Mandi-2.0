@@ -58,7 +58,7 @@ export function Approvals() {
   const { t } = useT();
   return (
     <QueryBoundary query={q} skeleton={<ListSkeleton rows={3} />} isEmpty={(d) => d.length === 0} empty={<EmptyState icon={ClipboardCheck} title={t("empty.approvalsTitle")} description={t("empty.approvalsBody")} />}>
-      {(rows) => <div className="space-y-4">{rows.map((a) => <ApprovalCard key={a.id} a={a} />)}</div>}
+      {(rows) => <div className="space-y-4" data-tour="approvals-list">{rows.map((a) => <ApprovalCard key={a.id} a={a} />)}</div>}
     </QueryBoundary>
   );
 }

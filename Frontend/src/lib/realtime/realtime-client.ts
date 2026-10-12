@@ -13,6 +13,8 @@ interface Options<T> {
 
 /** WebSocket with exponential backoff + jitter. Call the returned function to close and clean up. */
 export function connectRealtime<T>({ path, onMessage, onState, parse, maxRetries = 6 }: Options<T>): () => void {
+  // Demo mode has no socket server; screens fall back to polling.
+  if (env.demoMode) return () => undefined;
   let ws: WebSocket | null = null;
   let attempt = 0;
   let everOpened = false;

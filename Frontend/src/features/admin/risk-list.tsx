@@ -18,7 +18,7 @@ export function RiskList() {
   return (
     <QueryBoundary query={q} skeleton={<ListSkeleton />} isEmpty={(d) => d.length === 0} empty={<EmptyState icon={ShieldCheck} title={t("empty.riskTitle")} description={t("empty.riskBody")} />}>
       {(rows) => (
-        <ul className="space-y-3">
+        <ul className="space-y-3" data-tour="risk-list">
           {rows.map((r) => (
             <li key={r.id}>
               <Card className="p-4">

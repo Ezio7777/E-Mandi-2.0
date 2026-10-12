@@ -116,6 +116,9 @@ The frontend never needs a secret key. `publicKey` (or `NEXT_PUBLIC_PAYMENT_PUBL
 
 `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_WS_URL` (optional), `NEXT_PUBLIC_GOOGLE_CLIENT_ID`, `NEXT_PUBLIC_PAYMENT_PUBLIC_KEY`, `NEXT_PUBLIC_APP_ENV`. Image hosts for `next/image` go in build-time `IMAGE_REMOTE_HOSTS` (your S3 bucket or CDN hostname, comma-separated).
 
+## Reference implementation
+`src/lib/demo/handler.ts` implements every endpoint above in-browser (used when no `NEXT_PUBLIC_API_URL` is set). It is the most precise reference for response shapes, status codes and role checks (401 unauthenticated, 403 wrong role, 400 validation, 404 missing).
+
 ## Quick compatibility check
 
 `npm run mock-api` starts a stand-in that implements all of the above with seeded data (`tools/mock-api/server.mjs`). It is a handy reference for response shapes.
