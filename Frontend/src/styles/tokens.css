@@ -1,0 +1,74 @@
+/* E-Mandi design tokens. HSL channels only (no hsl() wrapper) so Tailwind can apply alpha. */
+:root {
+  --background: 60 25% 98.5%;
+  --foreground: 150 14% 11%;
+  --surface: 90 18% 96%;
+  --surface-raised: 0 0% 100%;
+  --card: 0 0% 100%;
+  --card-foreground: 150 14% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 150 14% 11%;
+
+  --primary: 152 44% 30%;
+  --primary-foreground: 60 30% 98%;
+  --primary-soft: 145 32% 93%;
+  --secondary: 90 20% 93%;
+  --secondary-foreground: 150 20% 18%;
+  --muted: 90 14% 94%;
+  --muted-foreground: 150 8% 38%;
+  --accent: 145 30% 90%;
+  --accent-foreground: 152 44% 20%;
+
+  --border: 140 14% 86%;
+  --input: 140 14% 82%;
+  --ring: 152 44% 36%;
+
+  --success: 148 58% 25%;
+  --success-foreground: 0 0% 100%;
+  --warning: 36 95% 26%;
+  --warning-foreground: 40 100% 8%;
+  --danger: 4 68% 44%;
+  --danger-foreground: 0 0% 100%;
+
+  --grade-a: 152 50% 30%;
+  --grade-b: 36 92% 27%;
+  --grade-c: 14 72% 46%;
+
+  --radius: 0.75rem;
+}
+
+.dark {
+  --background: 150 14% 5%;
+  --foreground: 90 12% 94%;
+  --surface: 150 12% 8%;
+  --surface-raised: 150 11% 11%;
+  --card: 150 12% 9%;
+  --card-foreground: 90 12% 94%;
+  --popover: 150 12% 9%;
+  --popover-foreground: 90 12% 94%;
+
+  --primary: 146 40% 62%;
+  --primary-foreground: 150 24% 7%;
+  --primary-soft: 150 22% 14%;
+  --secondary: 150 10% 15%;
+  --secondary-foreground: 90 12% 92%;
+  --muted: 150 10% 13%;
+  --muted-foreground: 90 6% 66%;
+  --accent: 150 18% 17%;
+  --accent-foreground: 146 40% 80%;
+
+  --border: 150 9% 19%;
+  --input: 150 9% 24%;
+  --ring: 146 40% 62%;
+
+  --success: 146 44% 58%;
+  --success-foreground: 150 24% 7%;
+  --warning: 40 90% 62%;
+  --warning-foreground: 40 100% 8%;
+  --danger: 4 80% 68%;
+  --danger-foreground: 4 60% 8%;
+
+  --grade-a: 146 42% 62%;
+  --grade-b: 40 88% 62%;
+  --grade-c: 16 82% 66%;
+}

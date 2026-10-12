@@ -1,0 +1,14 @@
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+.skeleton-shimmer { position: relative; overflow: hidden; }
+.skeleton-shimmer::after {
+  content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, hsl(var(--foreground) / 0.06), transparent);
+  animation: shimmer 1.6s infinite;
+}

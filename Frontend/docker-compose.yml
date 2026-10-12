@@ -1,0 +1,11 @@
+services:
+  web:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
+        NEXT_PUBLIC_PAYMENT_PUBLIC_KEY: ${NEXT_PUBLIC_PAYMENT_PUBLIC_KEY:-}
+        IMAGE_REMOTE_HOSTS: ${IMAGE_REMOTE_HOSTS:-}
+    ports: ["3000:3000"]
+    restart: unless-stopped
