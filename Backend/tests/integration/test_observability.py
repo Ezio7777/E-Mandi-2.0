@@ -2,8 +2,6 @@ import uuid
 from datetime import timedelta
 
 import pytest
-from sqlalchemy import select, text
-
 from app.core.config import get_settings
 from app.core.database import get_sessionmaker
 from app.models.agent_execution import AgentExecution
@@ -13,13 +11,15 @@ from app.models.enums import AgentStatus as AS
 from app.models.enums import ListingStatus
 from app.utils.time import utcnow
 from app.workers.analytics_jobs import refresh_analytics_job
+from sqlalchemy import select, text
+
 from tests.integration.conftest import bearer
 from tests.integration.test_disputes import dispute, paid
 from tests.integration.test_grading import make_admin
-from tests.integration.test_matching_agent import buyer, farmer, mk
+from tests.integration.test_matching_agent import farmer, mk
 from tests.integration.test_payments import MP, deliver, setup, start
-from tests.integration.test_risk import run
 from tests.integration.test_pricing_agent import seed_market
+from tests.integration.test_risk import run
 
 AU, AD, AN_ = "/api/v1/audit", "/api/v1/admin", "/api/v1/analytics"
 
@@ -51,7 +51,7 @@ async def test_audit_is_admin_only_and_read_only(app_ctx, client, db, demo_users
     async with get_sessionmaker()() as s:  # the DB itself refuses tampering (append-only trigger)
         row = (await s.scalars(select(AuditLog).limit(1))).first()
         assert row is not None
-        with pytest.raises(Exception, match="(?i)append|immutable|not allowed|audit"):
+        with pytest.raises(Exception, match=r"(?i)append|immutable|not allowed|audit"):
             await s.execute(text("UPDATE audit_logs SET action='x' WHERE id=:i"), {"i": row.id})
             await s.commit()
 

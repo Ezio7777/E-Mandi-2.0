@@ -24,7 +24,7 @@ class GeminiEmbeddingProvider:
         self.timeout = settings.AI_PROVIDER_TIMEOUT_SECONDS
         key = settings.GEMINI_API_KEY.get_secret_value()
         self._configured = bool(key and self.model)
-        self.client = client or (genai.Client(api_key=key) if self._configured else None)
+        self.client: Any = client or (genai.Client(api_key=key) if self._configured else None)
         self.model_id = f"gemini:{self.model}:{self.dim}"
 
     @property
@@ -38,9 +38,9 @@ class GeminiEmbeddingProvider:
             resp = await asyncio.wait_for(self.client.aio.models.embed_content(
                 model=self.model, contents=texts,
                 config=types.EmbedContentConfig(task_type=task, output_dimensionality=self.dim)), self.timeout)
-        except (TimeoutError, asyncio.TimeoutError) as exc:
+        except TimeoutError as exc:
             raise EmbeddingProviderError("timeout") from exc
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning("gemini_embed_failed", error_type=type(exc).__name__)
             raise EmbeddingProviderError("api_error") from exc
         vecs = [list(e.values) for e in (resp.embeddings or [])]

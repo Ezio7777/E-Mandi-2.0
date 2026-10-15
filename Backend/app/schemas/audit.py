@@ -1,11 +1,12 @@
 import uuid
 from datetime import datetime
-from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
+
+from app.schemas.common import CamelBlob, CamelModel
 
 
-class AuditOut(BaseModel):
+class AuditOut(CamelModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
     id: uuid.UUID
     actor_id: uuid.UUID | None
@@ -14,24 +15,24 @@ class AuditOut(BaseModel):
     entity_type: str
     entity_id: str | None
     timestamp: datetime
-    metadata: dict[str, Any] = Field(validation_alias="meta")
-    previous_state: dict[str, Any] | None
-    new_state: dict[str, Any] | None
+    metadata: CamelBlob = Field(validation_alias="meta")
+    previous_state: CamelBlob | None
+    new_state: CamelBlob | None
     ip_address: str | None
     request_id: str | None
 
 
-class AuditPage(BaseModel):
+class AuditPage(CamelModel):
     items: list[AuditOut]
     next_cursor: str | None
 
 
-class ActionCount(BaseModel):
+class ActionCount(CamelModel):
     action: str
     count: int
 
 
-class AuditTimeline(BaseModel):
+class AuditTimeline(CamelModel):
     entity_type: str
     entity_id: str
     events: list[AuditOut]

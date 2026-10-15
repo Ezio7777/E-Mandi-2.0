@@ -3,8 +3,9 @@ They only repair *infrastructure* gaps (lost jobs, crashed runs, expired rows); 
 (no auto-execution of approvals, no price/inventory changes)."""
 import json
 import re
+import time
 import uuid
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Any
 
 from redis.asyncio import Redis
@@ -28,6 +29,7 @@ from app.models.enums import (
 )
 from app.models.idempotency_key import IdempotencyKey
 from app.models.listing import Listing
+from app.models.listing_document import ListingDocument
 from app.models.listing_image import ListingImage
 from app.models.otp_challenge import OtpChallenge
 from app.models.payment_event import PaymentEvent
@@ -181,7 +183,7 @@ class RecoveryService:
     # ------------------------------------------------------------------ d) expired rows
     async def cleanup_expired(self) -> dict[str, int]:
         now, out = utcnow(), {}
-        plans = [("idempotency_keys", IdempotencyKey, IdempotencyKey.expires_at < now),
+        plans: list[tuple[str, Any, Any]] = [("idempotency_keys", IdempotencyKey, IdempotencyKey.expires_at < now),
                  ("otp_challenges", OtpChallenge, OtpChallenge.expires_at < now - timedelta(days=1)),
                  ("sessions", Session, (Session.expires_at < now - timedelta(days=7))
                   | (Session.revoked_at < now - timedelta(days=7)))]
@@ -190,9 +192,10 @@ class RecoveryService:
             while True:
                 async with self.sm() as session, transactional(session):
                     ids = (await session.scalars(select(model.id).where(cond).limit(1000))).all()
-                    if ids:
-                        await session.execute(delete(model).where(model.id.in_(ids)))
-                total += len(ids)
+                    removed = 0
+                    if ids:  # rowcount, not len(ids): a parallel sweeper may already have deleted some of these rows
+                        removed = getattr(await session.execute(delete(model).where(model.id.in_(ids))), "rowcount", 0) or 0
+                total += removed
                 if len(ids) < 1000:
                     break
             out[name] = total
@@ -210,6 +213,7 @@ class RecoveryService:
             return {"scanned": len(listed), "deleted": 0}
         async with self.sm() as session:  # a DB error here raises BEFORE anything is deleted
             known = set((await session.scalars(select(ListingImage.s3_key).where(ListingImage.s3_key.in_(old)))).all())
+            known |= set((await session.scalars(select(ListingDocument.s3_key).where(ListingDocument.s3_key.in_(old)))).all())
         deleted = 0
         for key in old:
             if key in known or deleted >= s.ORPHAN_S3_MAX_DELETES:
@@ -277,7 +281,7 @@ async def read_worker_status(redis: Redis, sweepers: list[str]) -> dict[str, Any
     hb = await redis.get(HEARTBEAT_KEY)
     age = None
     if hb:
-        age = max(0, int((utcnow() - datetime.fromisoformat(hb)).total_seconds()))
+        age = max(0, int(time.time() - float(hb)))
     last = {}
     for n in sweepers:
         raw = await redis.get(SWEEPER_KEY.format(n))

@@ -1,11 +1,15 @@
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, pg_enum, uuid_pk
 from app.models.enums import AuthProvider, UserRole
+
+if TYPE_CHECKING:
+    from app.models.user_profile import UserProfile
 
 
 class User(Base, TimestampMixin):
@@ -27,5 +31,5 @@ class User(Base, TimestampMixin):
     ban_reason: Mapped[str | None] = mapped_column(Text)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
-    profile: Mapped["UserProfile | None"] = relationship(  # noqa: F821
+    profile: Mapped["UserProfile | None"] = relationship(
         back_populates="user", uselist=False, lazy="selectin")

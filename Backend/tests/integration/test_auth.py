@@ -3,8 +3,6 @@ from datetime import timedelta
 
 import jwt
 import pytest
-from sqlalchemy import select
-
 from app.core.config import get_settings
 from app.core.dependencies import forbid_demo, require_roles
 from app.core.security import create_access_token
@@ -12,6 +10,8 @@ from app.integrations.google.oidc import GoogleIdentity
 from app.models.audit_log import AuditLog
 from app.models.enums import UserRole
 from app.models.user import User
+from sqlalchemy import select
+
 from tests.integration.conftest import REG, bearer, register
 
 A = "/api/v1/auth"
@@ -112,11 +112,11 @@ async def test_rbac_dependency(app_ctx, client):
     r = APIRouter()
 
     @r.get("/_t/admin", dependencies=[Depends(require_roles(UserRole.ADMIN))])
-    async def admin_only():  # noqa: ANN202
+    async def admin_only():
         return {"ok": True}
 
     @r.post("/_t/destructive", dependencies=[Depends(forbid_demo)])
-    async def destructive():  # noqa: ANN202
+    async def destructive():
         return {"ok": True}
 
     app_ctx.include_router(r)
@@ -215,7 +215,8 @@ async def test_demo_login_uses_seeded_users_only(client, demo_users):
 
 async def test_demo_not_seeded_and_disabled(app_ctx, client):
     assert (await client.post(f"{A}/demo/admin")).status_code == 503
-    from app.core.config import Settings, get_settings as gs
+    from app.core.config import Settings
+    from app.core.config import get_settings as gs
     app_ctx.dependency_overrides[gs] = lambda: Settings(DEMO_MODE=False, ENVIRONMENT="test")
     assert (await client.post(f"{A}/demo/admin")).status_code == 404
     assert (await client.get(f"{A}/demo")).status_code == 404
@@ -226,7 +227,7 @@ async def test_demo_session_blocked_from_destructive_actions(app_ctx, client, de
     r = APIRouter()
 
     @r.post("/_t/ban", dependencies=[Depends(forbid_demo)])
-    async def ban():  # noqa: ANN202
+    async def ban():
         return {"ok": True}
 
     app_ctx.include_router(r)
@@ -264,3 +265,16 @@ async def test_failed_action_leaves_no_audit_row(client, db):
 
 
 _ = (pytest, timedelta, create_access_token)
+
+
+async def test_otp_request_surfaces_delivery_failure_as_503_without_leaking(app_ctx, client):
+    from app.core.dependencies import get_otp_sender
+    from app.integrations.sms import OtpDeliveryFailed
+
+    class Failing:
+        async def send(self, phone, code):
+            raise OtpDeliveryFailed()
+
+    app_ctx.dependency_overrides[get_otp_sender] = lambda: Failing()
+    r = await client.post("/api/v1/auth/otp/request", json={"phone": "+919876543210"})
+    assert r.status_code == 503 and r.json()["error"]["code"] == "otp_delivery_failed"

@@ -7,7 +7,10 @@ from google.genai import types
 from app.core.config import Settings
 from app.core.logging import get_logger
 from app.integrations.vision_common import (
-    SYSTEM_PROMPT, GradingProviderError, parse_raw_grading, user_prompt,
+    SYSTEM_PROMPT,
+    GradingProviderError,
+    parse_raw_grading,
+    user_prompt,
 )
 from app.schemas.grading import RawGrading
 
@@ -22,7 +25,7 @@ class GeminiVisionGrader:
         self.timeout = settings.AI_PROVIDER_TIMEOUT_SECONDS
         key = settings.GEMINI_API_KEY.get_secret_value()
         self._configured = bool(key and self.model)
-        self.client = client or (genai.Client(api_key=key) if self._configured else None)
+        self.client: Any = client or (genai.Client(api_key=key) if self._configured else None)
 
     @property
     def available(self) -> bool:
@@ -38,9 +41,9 @@ class GeminiVisionGrader:
                 config=types.GenerateContentConfig(system_instruction=SYSTEM_PROMPT, temperature=0,
                                                    response_mime_type="application/json")),
                 timeout=self.timeout)
-        except (TimeoutError, asyncio.TimeoutError) as exc:
+        except TimeoutError as exc:
             raise GradingProviderError("timeout", self.name) from exc
-        except Exception as exc:  # noqa: BLE001  (SDK raises many types; all are "api_error" to callers)
+        except Exception as exc:
             log.warning("gemini_call_failed", error_type=type(exc).__name__)
             raise GradingProviderError("api_error", self.name) from exc
         return parse_raw_grading(getattr(resp, "text", None) or "", self.name)

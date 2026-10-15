@@ -5,7 +5,14 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, Request, Response
 
 from app.core.dependencies import (
-    CurrentUser, RequestContextDep, SessionDep, SettingsDep, forbid_demo, get_job_queue, get_payment_provider, require_roles,
+    CurrentUser,
+    RequestContextDep,
+    SessionDep,
+    SettingsDep,
+    forbid_demo,
+    get_job_queue,
+    get_payment_provider,
+    require_roles,
 )
 from app.core.errors import AppError, DomainValidationError
 from app.core.rate_limit import rate_limit

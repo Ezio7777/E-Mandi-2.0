@@ -2,14 +2,8 @@
 explanation, source); the alias mapping is explicit here and applied on output (FastAPI serialises by alias)."""
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
-from pydantic.alias_generators import to_camel
-
+from app.schemas.common import CamelModel
 from app.schemas.listing import Rupees
-
-
-class CamelModel(BaseModel):
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 
 class PriceFactorOut(CamelModel):

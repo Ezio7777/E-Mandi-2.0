@@ -1,4 +1,5 @@
 """Recovery/maintenance jobs (scheduled via arq cron in Stage 18). Each is idempotent and safe to run concurrently."""
+import time
 from typing import Any
 
 from app.core.config import get_settings
@@ -32,7 +33,6 @@ from redis.asyncio import Redis  # noqa: E402
 
 from app.integrations.aws.s3 import S3Storage  # noqa: E402
 from app.services.recovery import HEARTBEAT_KEY, RecoveryService  # noqa: E402
-from app.utils.time import utcnow  # noqa: E402
 from app.workers.queue import ArqJobQueue  # noqa: E402
 
 SWEEPERS = {
@@ -101,7 +101,7 @@ async def worker_heartbeat_job(ctx: dict[str, Any]) -> None:
     settings = ctx.get("settings") or get_settings()
     redis = ctx.get("redis_client") or Redis.from_url(settings.REDIS_URL, decode_responses=True)
     try:
-        await redis.set(HEARTBEAT_KEY, utcnow().isoformat(), ex=600)
+        await redis.set(HEARTBEAT_KEY, f"{time.time():.3f}", ex=600)  # epoch seconds: /health/ready parses it as a float
     finally:
         if ctx.get("redis_client") is None:
             await redis.aclose()

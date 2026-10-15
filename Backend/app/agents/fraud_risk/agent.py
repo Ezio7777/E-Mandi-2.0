@@ -51,7 +51,7 @@ class FraudRiskAgent:
         self.session, self.settings, self.llms = session, settings, llms or []
         self.graph = self._build()
 
-    def _build(self):  # noqa: ANN202
+    def _build(self):
         g = StateGraph(RiskState)
         for n in ("load_context", "run_rules", "summarize", "persist"):
             g.add_node(n, getattr(self, n))
@@ -73,7 +73,7 @@ class FraudRiskAgent:
             eid = uuid.UUID(s["entity_id"])
         except ValueError:
             return {"outcome": "skipped"}
-        ctx = None
+        ctx: Any = None
         if kind == "listing" and et in LISTING_EVENTS:
             ctx = await C.listing_context(self.session, eid)
         elif kind == "order" and et == "order.created":

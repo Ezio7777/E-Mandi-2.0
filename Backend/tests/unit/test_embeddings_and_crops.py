@@ -2,7 +2,6 @@ import math
 from types import SimpleNamespace
 
 import pytest
-
 from app.core.config import Settings
 from app.integrations.gemini.embeddings import EmbeddingProviderError, GeminiEmbeddingProvider
 from app.services.embedding import HashEmbeddingProvider, build_embedding_provider
@@ -13,7 +12,7 @@ S = Settings(ENVIRONMENT="test", JWT_SECRET="x" * 40, EMBEDDING_DIM=64, AI_PROVI
 
 
 def cos(a, b):
-    return sum(x * y for x, y in zip(a, b))
+    return sum(x * y for x, y in zip(a, b, strict=True))
 
 
 async def test_hash_embedding_properties():

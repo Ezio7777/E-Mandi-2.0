@@ -13,6 +13,7 @@ from app.core.database import transactional
 from app.core.logging import get_logger
 from app.models.agent_execution import AgentExecution
 from app.models.enums import AgentName, AgentStatus
+from app.utils.must import must
 from app.utils.time import utcnow
 from app.workers.queue import JobQueue
 
@@ -48,8 +49,9 @@ class AgentExecutionService:
         res = await self.session.execute(pg_insert(AgentExecution).values(**values).on_conflict_do_nothing(
             index_elements=["idempotency_key"]).returning(AgentExecution.id))
         new_id = res.scalar_one_or_none()
-        ex = await self.session.scalar(select(AgentExecution).where(AgentExecution.id == (new_id or values["id"]))
-                                       if new_id else select(AgentExecution).where(AgentExecution.idempotency_key == idempotency_key))
+        stmt = (select(AgentExecution).where(AgentExecution.id == new_id) if new_id
+                else select(AgentExecution).where(AgentExecution.idempotency_key == idempotency_key))
+        ex = must(await self.session.scalar(stmt), "Agent execution")
         return ex, new_id is not None  # type: ignore[return-value]
 
     async def get(self, execution_id: uuid.UUID) -> AgentExecution | None:
@@ -87,7 +89,7 @@ async def dispatch(session: AsyncSession, queue: JobQueue, *, agent: AgentName, 
     if created:
         try:
             await queue.enqueue(job_name, *job_args, str(ex.id))
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.error("agent_enqueue_failed", agent=agent.value, execution_id=str(ex.id), error=str(exc))
     return ex.id
 

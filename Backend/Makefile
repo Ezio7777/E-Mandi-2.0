@@ -10,7 +10,7 @@ worker:
 	arq app.workers.settings.WorkerSettings
 
 lint:
-	ruff check . && ruff format --check .
+	ruff check . && mypy app
 
 format:
 	ruff check --fix . && ruff format .

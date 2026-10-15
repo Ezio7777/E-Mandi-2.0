@@ -25,7 +25,11 @@ from app.models.user_profile import UserProfile
 from app.repositories.image import ImageRepository
 from app.repositories.listing import ListingRepository
 from app.schemas.image import (
-    AvatarOut, ImageOut, ProfileUploadInitRequest, UploadInitRequest, UploadInitResponse,
+    AvatarOut,
+    ImageOut,
+    ProfileUploadInitRequest,
+    UploadInitRequest,
+    UploadInitResponse,
 )
 from app.services.access import assert_can_view_listing, assert_owner_listing
 from app.services.audit import Actor, AuditService, RequestContext

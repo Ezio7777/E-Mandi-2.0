@@ -16,13 +16,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings
 from app.core.database import transactional
 from app.core.errors import (
-    AppError, ConflictError, ForbiddenError, NotFoundError, RateLimitError, UnauthorizedError,
+    AppError,
+    ConflictError,
+    ForbiddenError,
+    NotFoundError,
+    RateLimitError,
+    UnauthorizedError,
 )
 from app.core.logging import get_logger
 from app.core.rate_limit import check_rate_limit
 from app.core.security import (
-    constant_time_equals, create_access_token, generate_otp, generate_refresh_token, hash_otp,
-    hash_password, hash_token, password_needs_rehash, verify_password,
+    constant_time_equals,
+    create_access_token,
+    generate_otp,
+    generate_refresh_token,
+    hash_otp,
+    hash_password,
+    hash_token,
+    password_needs_rehash,
+    verify_password,
 )
 from app.integrations.google.oidc import GoogleIdentityVerifier
 from app.integrations.sms import OTPSender
@@ -82,7 +94,7 @@ class AuthService:
             return
         try:
             ok, retry = await check_rate_limit(self.redis, f"rl:{name}:{ident}", limit, window)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning("throttle_backend_error", name=name, error=str(exc))
             return
         if not ok:

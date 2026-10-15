@@ -3,14 +3,14 @@ import uuid
 from datetime import date, timedelta
 from decimal import Decimal
 
-from sqlalchemy import select
-
 from app.core.database import get_sessionmaker, transactional
 from app.core.errors import InsufficientStockError
 from app.models.audit_log import AuditLog
 from app.models.enums import ListingStatus
 from app.models.listing import Listing
 from app.services.inventory import InventoryService
+from sqlalchemy import select
+
 from tests.integration.conftest import bearer, register
 from tests.integration.test_images import confirm, img_bytes, upload
 
@@ -213,7 +213,8 @@ async def test_release_and_commit_sale_lifecycle(client, db):
     await db.refresh(await db.get(Listing, lid))
     assert (await db.get(Listing, lid)).status == ListingStatus.RESERVED
     await _run("release_many", (lid, Decimal(40)))
-    l = await db.get(Listing, lid); await db.refresh(l)
+    l = await db.get(Listing, lid)
+    await db.refresh(l)
     assert l.reserved_kg == 60 and l.status == ListingStatus.ACTIVE
     await _run("commit_sale_many", (lid, Decimal(60)))
     await db.refresh(l)
@@ -233,5 +234,6 @@ async def test_multi_listing_reservation_is_atomic(client, db):
         await set_status(db, x["id"], ListingStatus.ACTIVE)
     ia, ib = uuid.UUID(a["id"]), uuid.UUID(b["id"])
     assert await _run("reserve_many", (ia, Decimal(10)), (ib, Decimal(6))) == "insufficient"  # b short => a untouched
-    la = await db.get(Listing, ia); await db.refresh(la)
+    la = await db.get(Listing, ia)
+    await db.refresh(la)
     assert la.reserved_kg == 0 and la.status == ListingStatus.ACTIVE

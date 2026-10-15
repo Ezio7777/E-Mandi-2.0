@@ -87,6 +87,16 @@ class InventoryService:
                 _set_status(l, L.ACTIVE)
         await self.session.flush()
 
+    async def restock_many(self, items: list[Item]) -> None:
+        """Returns SOLD stock to the listing (full refund). Total quantity increases; SOLD/RESERVED listings with stock become ACTIVE.
+        ARCHIVED/DRAFT/review listings keep their status (the farmer decides whether to relist)."""
+        for lid, qty in _sorted(items):
+            l = await self._lock(lid)
+            l.quantity_kg = l.quantity_kg + qty
+            if l.status in {L.SOLD, L.RESERVED} and l.available_kg > 0:
+                _set_status(l, L.ACTIVE)
+        await self.session.flush()
+
     # ---- farmer-facing ----
     async def inventory_for(self, user: User) -> list[InventoryItemOut]:
         from app.repositories.listing import ListingFilters

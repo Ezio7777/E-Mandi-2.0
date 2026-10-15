@@ -4,28 +4,26 @@ import uuid
 from collections.abc import AsyncIterator
 from pathlib import Path
 
+import app.models  # noqa: F401
 import pytest
 import pytest_asyncio
-from httpx import ASGITransport, AsyncClient
-from redis.asyncio import Redis
-from sqlalchemy import text
-
-import app.models  # noqa: F401
 from app.core.config import get_settings
 from app.core.database import dispose_engine, get_engine, get_sessionmaker
 from app.core.dependencies import get_google_verifier, get_job_queue, get_otp_sender, get_payment_provider, get_storage
-from app.integrations.payments.mock import MockPaymentProvider
-from app.workers.queue import RecordingJobQueue
-from app.core.errors import UnauthorizedError
+from app.core.errors import ProviderError, UnauthorizedError
 from app.integrations.aws.s3 import ObjectHead, PresignedPost
-from app.core.errors import ProviderError
 from app.integrations.google.oidc import GoogleIdentity
+from app.integrations.payments.mock import MockPaymentProvider
 from app.main import create_app
 from app.models.base import Base
 from app.models.enums import AuthProvider, UserRole
 from app.models.user import User
 from app.models.user_profile import UserProfile
 from app.services.auth import DEMO_ACCOUNTS
+from app.workers.queue import RecordingJobQueue
+from httpx import ASGITransport, AsyncClient
+from redis.asyncio import Redis
+from sqlalchemy import text
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -70,25 +68,25 @@ class FakeStorage:
     def put(self, key: str, data: bytes) -> None:
         self.objects[key] = data
 
-    async def presign_post(self, key, content_type, max_bytes, expires):  # noqa: ANN001, ANN201
+    async def presign_post(self, key, content_type, max_bytes, expires):
         return PresignedPost("https://fake-s3.local/bucket", {"key": key, "Content-Type": content_type})
 
-    async def presign_get(self, key, expires):  # noqa: ANN001, ANN201
+    async def presign_get(self, key, expires):
         return f"https://fake-s3.local/{key}?sig=abc"
 
-    async def head(self, key):  # noqa: ANN001, ANN201
+    async def head(self, key):
         return ObjectHead(len(self.objects[key]), None) if key in self.objects else None
 
-    async def get_bytes(self, key, max_bytes):  # noqa: ANN001, ANN201
+    async def get_bytes(self, key, max_bytes):
         data = self.objects[key]
         if len(data) > max_bytes:
             raise ProviderError("too big")
         return data
 
-    async def delete(self, key):  # noqa: ANN001, ANN201
+    async def delete(self, key):
         self.objects.pop(key, None)
 
-    async def list_keys(self, prefix, limit):  # noqa: ANN001, ANN201
+    async def list_keys(self, prefix, limit):
         from datetime import UTC, datetime
         return [(k, self.modified.get(k, datetime.now(UTC))) for k in sorted(self.objects) if k.startswith(prefix)][:limit]
 

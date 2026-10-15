@@ -11,7 +11,7 @@ LISTING_TRANSITIONS: dict[L, set[L]] = {
     L.REVIEW_REQUIRED: {L.ACTIVE, L.ARCHIVED, L.ANALYZING},
     L.ACTIVE: {L.RESERVED, L.SOLD, L.ARCHIVED},
     L.RESERVED: {L.ACTIVE, L.SOLD},
-    L.SOLD: set(),
+    L.SOLD: {L.ACTIVE},  # only via InventoryService.restock_many (refund of a fully sold listing)
     L.ARCHIVED: {L.DRAFT},
 }
 

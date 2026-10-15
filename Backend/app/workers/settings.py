@@ -1,6 +1,6 @@
 """arq WorkerSettings: `arq app.workers.settings.WorkerSettings`. One always-on worker process runs every agent job and
 the cron sweepers. Shared clients are built once in on_startup and reused via ctx."""
-from typing import Any
+from typing import Any, ClassVar
 
 from arq import cron
 from arq.connections import RedisSettings
@@ -58,11 +58,11 @@ async def on_shutdown(ctx: dict[str, Any]) -> None:
 
 
 class WorkerSettings:
-    functions = [grade_listing_job, price_listing_job, match_requirement_job, assess_risk_job, embed_market_reports_job,
+    functions: ClassVar[list[Any]] = [grade_listing_job, price_listing_job, match_requirement_job, assess_risk_job, embed_market_reports_job,
                  expire_reservations_job, refresh_analytics_job, recover_executions_job, recover_analyzing_job,
                  reprocess_webhooks_job, cleanup_expired_job, sweep_orphan_images_job, rematch_requirements_job,
                  fail_interrupted_actions_job, worker_heartbeat_job]
-    cron_jobs = [
+    cron_jobs: ClassVar[list[Any]] = [
         cron(worker_heartbeat_job, minute=set(range(60)), run_at_startup=True, unique=True),
         cron(expire_reservations_job, minute=set(range(60)), unique=True),
         cron(recover_executions_job, minute={1, 6, 11, 16, 21, 26, 31, 36, 41, 46, 51, 56}, unique=True),

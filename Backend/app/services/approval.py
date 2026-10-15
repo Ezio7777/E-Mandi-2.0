@@ -16,7 +16,14 @@ from app.core.logging import get_logger
 from app.models.anomaly_event import AnomalyEvent
 from app.models.dispute import Dispute
 from app.models.enums import (
-    AnomalyStatus, DisputeStatus, ListingStatus, NotificationType, PendingActionStatus, PendingActionType, ReviewDecision, UserRole,
+    AnomalyStatus,
+    DisputeStatus,
+    ListingStatus,
+    NotificationType,
+    PendingActionStatus,
+    PendingActionType,
+    ReviewDecision,
+    UserRole,
 )
 from app.models.listing import Listing
 from app.models.pending_action import PendingAction
@@ -29,6 +36,7 @@ from app.schemas.grading import ReviewRequest
 from app.services.audit import SYSTEM_ACTOR, Actor, AuditService, RequestContext
 from app.services.notification import NotificationService
 from app.services.transitions import ANOMALY_TRANSITIONS, assert_transition
+from app.utils.must import must
 from app.utils.pagination import decode_cursor, encode_cursor
 from app.utils.time import utcnow
 
@@ -134,12 +142,12 @@ class ApprovalService:
         except AppError as exc:
             await self.session.rollback()
             result, ok = {"error": exc.code, "message": exc.message[:300]}, False
-        except Exception as exc:  # noqa: BLE001 - never leak internals into the record
+        except Exception as exc:
             await self.session.rollback()
             log.error("pending_action_execution_failed", action_id=str(action_id), error_type=type(exc).__name__)
             result, ok = {"error": "internal_error"}, False
         async with transactional(self.session):
-            row = await self.repo.get(action_id, for_update=True)
+            row = must(await self.repo.get(action_id, for_update=True))
             row.status, row.executed_at, row.result = (PendingActionStatus.EXECUTED if ok else PendingActionStatus.FAILED), utcnow(), result
             self.audit.record(action="pending_action.executed" if ok else "pending_action.failed", entity_type="pending_action", entity_id=row.id,
                               actor=actor, ip=ctx.ip, metadata={"action_type": row.action_type.value, "result": result},

@@ -5,11 +5,8 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import jwt
-import pytest
-
 from app.core.config import get_settings
-from app.core.security import create_access_token
-from tests.integration.conftest import bearer
+
 from tests.integration.test_grading import make_admin
 from tests.integration.test_listings import create
 from tests.integration.test_matching_agent import buyer, farmer, mk
@@ -157,7 +154,7 @@ async def test_error_envelope_is_uniform_and_does_not_leak_internals(app_ctx, cl
               await client.put("/api/v1/auth/login")):
         assert r.status_code in (401, 404, 405, 422), r.status_code
         body = r.json()
-        err = body.get("error") or body
+        body.get("error") or body
         assert "request_id" in json.dumps(body) or r.status_code == 405
         text = r.text.lower()
         for leak in ("traceback", "sqlalchemy", 'file "', "psycopg", "asyncpg"):
@@ -213,8 +210,8 @@ async def test_request_id_is_not_trusted_blindly(app_ctx, client):
 
 
 async def test_webhook_rejects_bad_signature_without_touching_db(app_ctx, client, db):
-    from sqlalchemy import func, select
     from app.models.payment_event import PaymentEvent
+    from sqlalchemy import func, select
     for sig in (None, "", "deadbeef"):
         h = {"X-Mock-Event-Id": "evt_x", "Content-Type": "application/json"}
         if sig is not None:
@@ -223,3 +220,9 @@ async def test_webhook_rejects_bad_signature_without_touching_db(app_ctx, client
         assert r.status_code == 401
     assert await db.scalar(select(func.count()).select_from(PaymentEvent)) == 0
 
+
+
+async def test_oversized_body_is_rejected_before_processing(app_ctx, client):
+    big = b"{" + b" " * (get_settings().MAX_REQUEST_BYTES + 10) + b"}"
+    r = await client.post("/api/v1/auth/login", content=big, headers={"Content-Type": "application/json"})
+    assert r.status_code == 413 and r.json()["error"]["code"] == "payload_too_large"

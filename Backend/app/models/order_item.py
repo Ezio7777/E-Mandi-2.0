@@ -1,5 +1,6 @@
 import uuid
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import BigInteger, CheckConstraint, ForeignKey, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -7,6 +8,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base, pg_enum, uuid_pk
 from app.models.enums import Grade
 from app.models.order import Order
+
+if TYPE_CHECKING:
+    from app.models.listing import Listing
 
 
 class OrderItem(Base):
@@ -22,4 +26,4 @@ class OrderItem(Base):
     grade_at_purchase: Mapped[Grade | None] = mapped_column(pg_enum(Grade))
 
     order: Mapped[Order] = relationship(back_populates="items")
-    listing: Mapped["Listing"] = relationship(lazy="selectin", viewonly=True)  # noqa: F821
+    listing: Mapped["Listing"] = relationship(lazy="selectin", viewonly=True)

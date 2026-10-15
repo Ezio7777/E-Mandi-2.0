@@ -1,0 +1,30 @@
+{
+	email {$ACME_EMAIL}
+}
+
+{$API_DOMAIN} {
+	encode zstd gzip
+
+	# Payment webhooks and uploads are small; keep a hard cap above the 5 MB image / audio limits.
+	request_body {
+		max_size 8MB
+	}
+
+	# SSE (/notifications/stream) must not be buffered.
+	@sse path /api/v1/notifications/stream
+	reverse_proxy @sse api:8000 {
+		flush_interval -1
+		transport http {
+			read_timeout 6m
+		}
+	}
+
+	reverse_proxy api:8000 {
+		health_uri /health/live
+		health_interval 15s
+		header_up X-Forwarded-For {remote_host}
+	}
+
+	# Interactive API docs are disabled in production by the app; never expose internals via the proxy either.
+	header -Server
+}

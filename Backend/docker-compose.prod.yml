@@ -1,0 +1,43 @@
+# docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# Adds Caddy (automatic HTTPS) in front of the API. The API is no longer published on the host at all.
+services:
+  api:
+    ports: !reset []
+    expose: ["8000"]
+    environment:
+      ENVIRONMENT: production
+      FORWARDED_ALLOW_IPS: "*"
+    deploy:
+      resources:
+        limits: {memory: 1g}
+    logging: &logs
+      driver: json-file
+      options: {max-size: "20m", max-file: "5"}
+  worker:
+    environment:
+      ENVIRONMENT: production
+    deploy:
+      resources:
+        limits: {memory: 1g}
+    logging: *logs
+  db:
+    logging: *logs
+  redis:
+    logging: *logs
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN in .env (e.g. api.example.com)}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [api]
+    networks: [backend]
+    logging: *logs
+volumes:
+  caddy_data:
+  caddy_config:

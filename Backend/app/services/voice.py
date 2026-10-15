@@ -121,7 +121,7 @@ class VoiceService:
                 try:
                     sp = await tts.synthesize(answer, lang)
                     audio_out = AudioOut(mime=sp.mime, data_base64=base64.b64encode(sp.data).decode(), provider=sp.provider)
-                except Exception as exc:  # noqa: BLE001 - spoken output is optional; the text answer stands
+                except Exception as exc:
                     log.warning("voice_tts_failed", error_type=type(exc).__name__)
             if audio_out is None:
                 degraded.append("tts_unavailable")

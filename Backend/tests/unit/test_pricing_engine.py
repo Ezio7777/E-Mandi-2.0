@@ -3,10 +3,16 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
-
 from app.models.enums import Grade
 from app.services.pricing import (
-    MIN_PRICE_PAISE, NoMarketDataError, ReportPoint, clamp_price, compute_price, round_paise, to_out, within_bounds,
+    MIN_PRICE_PAISE,
+    NoMarketDataError,
+    ReportPoint,
+    clamp_price,
+    compute_price,
+    round_paise,
+    to_out,
+    within_bounds,
 )
 
 TODAY = date(2026, 9, 30)

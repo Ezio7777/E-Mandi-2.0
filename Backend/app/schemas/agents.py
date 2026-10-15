@@ -1,13 +1,14 @@
 import uuid
 from datetime import datetime
-from typing import Any, Literal
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
 
 from app.models.enums import AgentName, AgentStatus
+from app.schemas.common import CamelBlobList, CamelModel
 
 
-class ExecutionOut(BaseModel):
+class ExecutionOut(CamelModel):
     """Safe operational metadata only: no prompts, transcripts or reasoning are ever stored."""
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
@@ -19,7 +20,7 @@ class ExecutionOut(BaseModel):
     fallback_used: bool
     error_code: str | None
     summary: str | None
-    tool_calls: list[dict[str, Any]]
+    tool_calls: CamelBlobList
     related_entity_type: str | None
     related_entity_id: str | None
     created_at: datetime
@@ -28,12 +29,12 @@ class ExecutionOut(BaseModel):
     duration_ms: int | None
 
 
-class ExecutionPage(BaseModel):
+class ExecutionPage(CamelModel):
     items: list[ExecutionOut]
     next_cursor: str | None
 
 
-class LastExecution(BaseModel):
+class LastExecution(CamelModel):
     id: uuid.UUID
     status: AgentStatus
     trigger_type: str
@@ -41,7 +42,7 @@ class LastExecution(BaseModel):
     at: datetime
 
 
-class AgentSummaryOut(BaseModel):
+class AgentSummaryOut(CamelModel):
     agent: AgentName
     display_name: str
     mode: Literal["event_driven"] = "event_driven"  # agents run on events; they are NOT 24/7 processes
@@ -64,12 +65,12 @@ class AgentSummaryOut(BaseModel):
     health_reason: str | None
 
 
-class AgentDetailOut(BaseModel):
+class AgentDetailOut(CamelModel):
     summary: AgentSummaryOut
     top_error_codes: dict[str, int]
     recent: list[ExecutionOut]
 
 
-class ControlCenterOut(BaseModel):
+class ControlCenterOut(CamelModel):
     generated_at: datetime
     agents: list[AgentSummaryOut]

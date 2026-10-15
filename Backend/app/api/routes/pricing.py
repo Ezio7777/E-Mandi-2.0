@@ -2,12 +2,12 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
+from sqlalchemy import select
 
 from app.agents.runtime import dispatch
 from app.core.dependencies import CurrentUser, SessionDep, get_job_queue, require_roles
 from app.core.errors import ConflictError, NotFoundError
 from app.core.rate_limit import rate_limit
-from sqlalchemy import select
 from app.models.enums import AgentName, UserRole
 from app.models.enums import ListingStatus as L
 from app.models.pricing_result import PricingResult
@@ -22,8 +22,8 @@ router = APIRouter(prefix="/pricing", tags=["pricing"])
 
 
 def result_out(r: PricingResult) -> PricingResultOut:
-    from app.utils.money import paise_to_rupees as rs
     from app.schemas.pricing import PriceFactorOut
+    from app.utils.money import paise_to_rupees as rs
     return PricingResultOut(
         pricing_id=str(r.id), listing_id=str(r.listing_id), suggested=rs(r.suggested_paise), range_min=rs(r.range_min_paise),
         range_max=rs(r.range_max_paise), reference_price=rs(r.reference_paise), trend=r.trend,  # type: ignore[arg-type]
@@ -33,7 +33,7 @@ def result_out(r: PricingResult) -> PricingResultOut:
         created_at=r.created_at.isoformat())
 
 
-async def latest_pricing(session, listing_id: uuid.UUID) -> PricingResult | None:  # noqa: ANN001
+async def latest_pricing(session, listing_id: uuid.UUID) -> PricingResult | None:
     return await session.scalar(select(PricingResult).where(PricingResult.listing_id == listing_id)
                                 .order_by(PricingResult.created_at.desc()).limit(1))
 

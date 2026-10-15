@@ -19,7 +19,7 @@ MAX_ATTEMPTS = 3
 
 async def assess_risk_job(ctx: dict[str, Any], event_type: str, entity_type: str, entity_id: str, execution_id: str | None = None) -> None:
     settings = get_settings()
-    llms = ctx.get("llms") if ctx.get("llms") is not None else [GeminiTextLLM(settings), OpenAITextLLM(settings)]
+    llms: Any = ctx.get("llms") if ctx.get("llms") is not None else [GeminiTextLLM(settings), OpenAITextLLM(settings)]
     attempt = int(ctx.get("job_try", 1))
     async with get_sessionmaker()() as session:
         agent = FraudRiskAgent(session, settings, llms)

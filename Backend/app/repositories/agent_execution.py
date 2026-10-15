@@ -21,7 +21,7 @@ class AgentExecutionRepository:
         return {a: int(n) for a, n in rows}
 
     async def window_stats(self, since: datetime, stuck_before: datetime) -> dict[AgentName, dict[str, Any]]:
-        def cnt(*statuses: AgentStatus):  # noqa: ANN202
+        def cnt(*statuses: AgentStatus):
             return func.count().filter(E.status.in_(statuses))
 
         stmt = (select(E.agent_name, func.count().label("total"), cnt(AgentStatus.COMPLETED).label("ok"),
@@ -43,7 +43,7 @@ class AgentExecutionRepository:
     async def error_codes(self, agent: AgentName, since: datetime, limit: int = 10) -> dict[str, int]:
         stmt = (select(E.error_code, func.count()).where(E.agent_name == agent, E.created_at >= since, E.error_code.is_not(None))
                 .group_by(E.error_code).order_by(func.count().desc(), E.error_code).limit(limit))
-        return {c: int(n) for c, n in (await self.session.execute(stmt)).all()}
+        return {str(c): int(n) for c, n in (await self.session.execute(stmt)).all()}
 
     async def last(self, agent: AgentName) -> E | None:
         return await self.session.scalar(select(E).where(E.agent_name == agent).order_by(E.created_at.desc(), E.id.desc()).limit(1))

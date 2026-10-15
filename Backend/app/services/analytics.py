@@ -12,7 +12,13 @@ from app.core.logging import get_logger
 from app.models.anomaly_event import AnomalyEvent
 from app.models.dispute import Dispute
 from app.models.enums import (
-    AnomalyStatus, DisputeStatus, ListingStatus, OrderStatus, PaymentStatus, PendingActionStatus, RefundStatus, UserRole,
+    AnomalyStatus,
+    DisputeStatus,
+    ListingStatus,
+    OrderStatus,
+    PaymentStatus,
+    PendingActionStatus,
+    RefundStatus,
 )
 from app.models.listing import Listing
 from app.models.order import Order
@@ -21,7 +27,17 @@ from app.models.pending_action import PendingAction
 from app.models.refund import Refund
 from app.models.user import User
 from app.schemas.analytics import (
-    ListingsStat, Metric, OrdersStat, OverviewOut, PaymentsStat, RiskStat, SeriesPoint, TimeseriesOut, TopCrop, TopCropsOut, UsersStat,
+    ListingsStat,
+    Metric,
+    OrdersStat,
+    OverviewOut,
+    PaymentsStat,
+    RiskStat,
+    SeriesPoint,
+    TimeseriesOut,
+    TopCrop,
+    TopCropsOut,
+    UsersStat,
 )
 from app.utils.money import paise_to_rupees
 from app.utils.time import utcnow
@@ -51,7 +67,7 @@ class AnalyticsService:
                 raw = await self.redis.get(key)
                 if raw:
                     return OverviewOut.model_validate_json(raw), True
-            except Exception as exc:  # noqa: BLE001 - cache is an optimisation only
+            except Exception as exc:
                 log.warning("analytics_cache_read_failed", error_type=type(exc).__name__)
         out = await self.compute_overview(days)
         await self.store(out)
@@ -62,7 +78,7 @@ class AnalyticsService:
             return
         try:
             await self.redis.set(CACHE_KEY.format(days=out.window_days), out.model_dump_json(), ex=self.settings.ANALYTICS_CACHE_SECONDS)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning("analytics_cache_write_failed", error_type=type(exc).__name__)
 
     async def compute_overview(self, days: int) -> OverviewOut:
@@ -122,5 +138,5 @@ class AnalyticsService:
         stmt = (select(Listing.crop_name, func.count(), func.coalesce(func.sum(Listing.quantity_kg), 0), func.avg(Listing.base_price_paise))
                 .where(Listing.created_at >= since, Listing.status.not_in([ListingStatus.DRAFT, ListingStatus.ARCHIVED]))
                 .group_by(Listing.crop_name).order_by(func.count().desc(), Listing.crop_name).limit(limit))
-        return TopCropsOut(window_days=days, items=[TopCrop(crop=c, listings=int(n), total_kg=float(kg), average_price=paise_to_rupees(int(round(avg))))
+        return TopCropsOut(window_days=days, items=[TopCrop(crop=c, listings=int(n), total_kg=float(kg), average_price=paise_to_rupees(round(avg)))
                                                    for c, n, kg, avg in (await self.session.execute(stmt)).all()])

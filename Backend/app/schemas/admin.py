@@ -1,15 +1,20 @@
 import uuid
 from datetime import datetime
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.models.enums import (
-    AnomalySeverity, AnomalyStatus, PendingActionStatus, PendingActionType, ReviewDecision,
+    AnomalySeverity,
+    AnomalyStatus,
+    PendingActionStatus,
+    PendingActionType,
+    ReviewDecision,
 )
+from app.schemas.common import CamelBlob, CamelModel
 
 
-class AnomalyOut(BaseModel):
+class AnomalyOut(CamelModel):
     """A flag for human review - NOT a fraud verdict."""
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
@@ -20,39 +25,39 @@ class AnomalyOut(BaseModel):
     entity_id: str
     reason: str
     recommended_action: str
-    details: dict[str, Any]
+    details: CamelBlob
     detected_at: datetime
     reviewed_by: uuid.UUID | None
     reviewed_at: datetime | None
     review_note: str | None
 
 
-class AnomalyPage(BaseModel):
+class AnomalyPage(CamelModel):
     items: list[AnomalyOut]
     next_cursor: str | None
     open_count: int
 
 
-class NoteIn(BaseModel):
+class NoteIn(CamelModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     note: str = Field(min_length=5, max_length=1000)
 
 
-class BanUserPayload(BaseModel):
+class BanUserPayload(CamelModel):
     model_config = ConfigDict(extra="forbid")
     user_id: uuid.UUID
     reason: str = Field(min_length=5, max_length=1000)
     anomaly_id: uuid.UUID | None = None
 
 
-class ApproveGradePayload(BaseModel):
+class ApproveGradePayload(CamelModel):
     model_config = ConfigDict(extra="forbid")
     listing_id: uuid.UUID
     reason: str = Field(min_length=5, max_length=1000)
     anomaly_id: uuid.UUID | None = None
 
 
-class ResolveDisputePayload(BaseModel):
+class ResolveDisputePayload(CamelModel):
     model_config = ConfigDict(extra="forbid")
     dispute_id: uuid.UUID
     outcome: Literal["SELLER_FAVOURED", "BUYER_REFUND"]
@@ -67,11 +72,11 @@ PAYLOADS: dict[PendingActionType, type[BaseModel]] = {
 }
 
 
-class ActionRequestIn(BaseModel):
+class ActionRequestIn(CamelModel):
     """Ask for a sensitive action. Nothing happens until a (different) admin approves it."""
     model_config = ConfigDict(extra="forbid")
     action_type: PendingActionType
-    payload: dict[str, Any]
+    payload: CamelBlob
 
     @model_validator(mode="after")
     def _payload_shape(self) -> "ActionRequestIn":
@@ -79,46 +84,59 @@ class ActionRequestIn(BaseModel):
         return self
 
 
-class AnomalyActionIn(BaseModel):
+class AnomalyActionIn(CamelModel):
     """Escalate a flag into a pending action; the anomaly id is attached server-side."""
     model_config = ConfigDict(extra="forbid")
     action_type: PendingActionType
-    payload: dict[str, Any]
+    payload: CamelBlob
 
 
-class DecisionIn(BaseModel):
+class DecisionIn(CamelModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     reason: str = Field(min_length=5, max_length=1000)
 
 
-class PendingActionOut(BaseModel):
+class PendingActionOut(CamelModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     action_type: PendingActionType
     status: PendingActionStatus
     entity_type: str
     entity_id: str
-    payload: dict[str, Any]
+    payload: CamelBlob
     requested_by: uuid.UUID | None
     requested_via: str
     decided_by: uuid.UUID | None
     decided_at: datetime | None
     decision_reason: str | None
     executed_at: datetime | None
-    result: dict[str, Any] | None
+    result: CamelBlob | None
     created_at: datetime
 
 
-class PendingActionPage(BaseModel):
+class PendingActionPage(CamelModel):
     items: list[PendingActionOut]
     next_cursor: str | None
     pending_count: int
 
 
-class RiskAssessIn(BaseModel):
+class RiskAssessIn(CamelModel):
     model_config = ConfigDict(extra="forbid")
     entity_type: Literal["listing", "order", "payment"]
     entity_id: uuid.UUID
 
 
 _ = ReviewDecision
+
+
+class SweeperRunOut(CamelModel):
+    at: str
+    ok: bool
+    result: dict[str, int]  # keys are counter names: left as emitted
+    error: str | None = None
+
+
+class WorkerStatusOut(CamelModel):
+    heartbeat_age_seconds: int | None
+    alive: bool
+    sweepers: dict[str, SweeperRunOut | None]

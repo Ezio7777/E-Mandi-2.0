@@ -2,12 +2,13 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
 
 from app.models.enums import UserRole
+from app.schemas.common import CamelModel
 
 
-class ProfileOut(BaseModel):
+class ProfileOut(CamelModel):
     model_config = ConfigDict(from_attributes=True)
     display_name: str | None = None
     business_name: str | None = None
@@ -18,7 +19,7 @@ class ProfileOut(BaseModel):
     preferred_language: str = "en"
 
 
-class ProfileUpdate(BaseModel):
+class ProfileUpdate(CamelModel):
     model_config = ConfigDict(extra="forbid")
     display_name: str | None = Field(None, max_length=200)
     business_name: str | None = Field(None, max_length=200)
@@ -29,7 +30,7 @@ class ProfileUpdate(BaseModel):
     preferred_language: Literal["en", "hi", "kn"] | None = None
 
 
-class UserOut(BaseModel):
+class UserOut(CamelModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     email: str | None

@@ -1,6 +1,7 @@
 """Answer composition for the Voice Assistant. Facts come from read-only tools; the DETERMINISTIC template (en/hi/kn) is
 always a complete, correct answer. An LLM may only re-phrase it: its text is accepted only if every number it contains
 was supplied in the facts, it is in the requested script, and it has no links - otherwise the template is used."""
+import contextlib
 import json
 import re
 from dataclasses import dataclass
@@ -117,7 +118,9 @@ def no_listings(crop: str | None, city: str | None, lang: str) -> str:
 
 
 def _same_city(a: str | None, b: str) -> bool:
-    return bool(a) and a.lower() in b.lower() or bool(a) and b.lower() in a.lower()
+    if not a:
+        return False
+    return a.lower() in b.lower() or b.lower() in a.lower()
 
 
 def market_price(crop: str, city: str | None, reports: list[ReportFact], lang: str) -> str:
@@ -196,10 +199,8 @@ SYSTEM = ("You rewrite a market assistant's answer for a farmer so it sounds nat
 def numbers_in(text: str) -> set[Decimal]:
     out: set[Decimal] = set()
     for tok in _NUM.findall(text):
-        try:
+        with contextlib.suppress(InvalidOperation):
             out.add(Decimal(tok.replace(",", "")))
-        except InvalidOperation:
-            pass
     return out
 
 

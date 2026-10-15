@@ -1,4 +1,5 @@
 """Redis sliding-window rate limiting exposed as a FastAPI dependency factory."""
+import contextlib
 import time
 import uuid
 from collections.abc import Awaitable, Callable
@@ -47,13 +48,11 @@ def rate_limit(name: str, limit: int, window_seconds: int, *, per_user: bool = F
         if per_user:
             auth = request.headers.get("authorization", "")
             if auth.lower().startswith("bearer "):
-                try:
+                with contextlib.suppress(AppError):  # invalid token: fall back to IP; the auth dependency rejects it anyway
                     ident = f"u:{decode_access_token(auth[7:]).user_id}"
-                except AppError:
-                    pass  # invalid token: fall back to IP; auth dependency will reject the request anyway
         try:
             ok, retry = await check_rate_limit(redis, f"rl:{name}:{ident}", limit, window_seconds)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning("rate_limit_backend_error", name=name, error=str(exc))
             if fail_open:
                 return

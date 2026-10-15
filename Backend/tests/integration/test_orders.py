@@ -3,15 +3,20 @@ import uuid
 from datetime import timedelta
 from decimal import Decimal
 
-from sqlalchemy import select
-
 from app.core.config import get_settings
 from app.core.database import get_sessionmaker
 from app.core.errors import InsufficientStockError
 from app.models.audit_log import AuditLog
 from app.models.buyer_requirement import BuyerRequirement
 from app.models.enums import (
-    AuthProvider, Grade, ListingStatus, MatchStatus, NotificationType, OrderStatus, RequirementStatus, UserRole,
+    AuthProvider,
+    Grade,
+    ListingStatus,
+    MatchStatus,
+    NotificationType,
+    OrderStatus,
+    RequirementStatus,
+    UserRole,
 )
 from app.models.idempotency_key import IdempotencyKey
 from app.models.listing import Listing
@@ -24,7 +29,8 @@ from app.services.audit import RequestContext
 from app.services.order import OrderService
 from app.utils.time import utcnow
 from app.workers.maintenance_jobs import expire_reservations_job
-from tests.integration.conftest import bearer
+from sqlalchemy import select
+
 from tests.integration.test_grading import make_admin
 from tests.integration.test_matching_agent import buyer, db_farmer, farmer, mk
 

@@ -11,8 +11,8 @@ from typing import Any
 
 from app.models.enums import Grade
 from app.repositories.listing import grades_at_least
-from app.utils.geo import GeoPoint, canonical_city, haversine_km
 from app.utils.crops import normalize_text
+from app.utils.geo import GeoPoint, canonical_city, haversine_km
 from app.utils.money import fmt_kg, paise_to_rupees
 
 WEIGHTS = {"grade": 0.15, "quantity": 0.30, "location": 0.20, "price": 0.25, "availability": 0.10}

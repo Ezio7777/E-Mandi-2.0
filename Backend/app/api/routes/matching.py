@@ -20,11 +20,16 @@ from app.utils.money import paise_to_rupees
 router = APIRouter(prefix="/matching", tags=["matching"])
 
 
+def pct(x: float) -> float:
+    """Internal 0-1 factor value -> UI-ready 0-100."""
+    return round(x * 100, 1)
+
+
 def match_out(m: Match, l: Listing) -> MatchOut:
     return MatchOut(
-        match_id=m.id, listing_id=m.listing_id, score=round(m.score * 100, 1), reasons=m.reasons,
-        grade_score=m.grade_score, quantity_score=m.quantity_score, location_score=m.location_score,
-        price_score=m.price_score, availability_score=m.availability_score, distance_km=m.distance_km, rank=m.rank,
+        match_id=m.id, listing_id=m.listing_id, score=pct(m.score), reasons=m.reasons,
+        grade_score=pct(m.grade_score), quantity_score=pct(m.quantity_score), location_score=pct(m.location_score),
+        price_score=pct(m.price_score), availability_score=pct(m.availability_score), distance_km=m.distance_km, rank=m.rank,
         status=m.status, created_at=m.created_at,
         listing=MatchListingSummary(crop_name=l.crop_name, farmer_name=l.farmer.full_name,
                                     price_per_kg=paise_to_rupees(l.base_price_paise), available_kg=l.available_kg,

@@ -63,7 +63,7 @@ class NotificationService:
         async with transactional(self.session):
             res = await self.session.execute(update(Notification).where(
                 Notification.user_id == user_id, Notification.is_read.is_(False)).values(is_read=True, read_at=utcnow()))
-        return res.rowcount or 0
+        return getattr(res, "rowcount", 0) or 0
 
     async def newer_than(self, user_id: uuid.UUID, after: tuple[datetime, uuid.UUID], limit: int = 50) -> list[Notification]:
         stmt = select(Notification).where(

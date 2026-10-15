@@ -62,7 +62,7 @@ class ProviderError(AppError):
 
 def _envelope(request: Request, code: str, message: str, details: list[dict[str, Any]] | None = None) -> dict:
     return {"error": {"code": code, "message": message, "details": details or [],
-                      "request_id": getattr(request.state, "request_id", None)}}
+                      "requestId": getattr(request.state, "request_id", None)}}
 
 
 def register_exception_handlers(app: FastAPI) -> None:

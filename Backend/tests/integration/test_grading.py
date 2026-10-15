@@ -1,9 +1,6 @@
 import uuid
 
 import pytest
-from arq import Retry
-from sqlalchemy import select
-
 from app.core.config import get_settings
 from app.core.security import hash_password
 from app.integrations.vision_common import GradingProviderError
@@ -19,9 +16,12 @@ from app.schemas.grading import RawGrading
 from app.services.grading import GradingService, GradingUnavailable
 from app.workers.grading_jobs import grade_listing_job
 from app.workers.queue import RecordingJobQueue
+from arq import Retry
+from sqlalchemy import select
+
 from tests.integration.conftest import bearer, register
 from tests.integration.test_images import confirm, img_bytes, upload
-from tests.integration.test_listings import PAYLOAD, create
+from tests.integration.test_listings import create
 
 S = get_settings()
 GOOD = dict(grade="A", confidence=0.94, defect_percentage=2.5, reason="Minor bruising", issues=["Minor bruising"])

@@ -5,12 +5,12 @@ from fastapi import APIRouter, Depends, Header, Query, Response
 
 from app.agents.fraud_risk.events import emit_risk_event
 from app.core.dependencies import CurrentUser, RequestContextDep, SessionDep, SettingsDep, get_job_queue, require_roles
-from app.workers.queue import JobQueue
 from app.core.rate_limit import rate_limit
 from app.models.enums import OrderStatus, UserRole
 from app.schemas.common import Envelope
 from app.schemas.order import CancelRequest, OrderCreate, OrderOut, OrderPage
 from app.services.order import OrderService, to_out
+from app.workers.queue import JobQueue
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 Buyer = Depends(require_roles(UserRole.BUYER))

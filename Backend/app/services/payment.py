@@ -37,6 +37,7 @@ from app.services.order import IdempotencyConflict, OrderService
 from app.services.transitions import DISPUTE_TRANSITIONS, PAYMENT_TRANSITIONS, assert_transition
 from app.utils.hashing import sha256_hex
 from app.utils.money import paise_to_rupees
+from app.utils.must import must
 from app.utils.time import utcnow
 
 log = get_logger(__name__)
@@ -119,13 +120,13 @@ class PaymentService:
                                                   notes={"payment_id": str(pid), "order_id": str(oid)})
         except ProviderError:
             async with transactional(self.session):
-                p = await self.payments.get_for_update(pid)
+                p = must(await self.payments.get_for_update(pid))
                 p.status, p.failure_reason = PaymentStatus.FAILED, "provider_error"
                 self.audit.record(action="payment.failed", entity_type="payment", entity_id=pid, actor=SYSTEM_ACTOR,
                                   metadata={"reason": "provider_error"}, previous_state={"status": "CREATED"}, new_state={"status": "FAILED"})
             raise
         async with transactional(self.session):
-            p = await self.payments.get_for_update(pid)
+            p = must(await self.payments.get_for_update(pid))
             p.provider_order_id = po.provider_order_id
             assert_transition(PAYMENT_TRANSITIONS, p.status, PaymentStatus.PENDING)
             p.status = PaymentStatus.PENDING
@@ -152,9 +153,9 @@ class PaymentService:
                 payload=ev.normalized()).on_conflict_do_nothing(constraint="uq_payment_events_provider_event")
                 .returning(PaymentEvent.id))).scalar_one_or_none()
             if new_id is None:
-                row = await self.session.scalar(select(PaymentEvent).where(
+                row = must(await self.session.scalar(select(PaymentEvent).where(
                     PaymentEvent.provider == self.provider.name, PaymentEvent.provider_event_id == ev.event_id)
-                    .execution_options(populate_existing=True))
+                    .execution_options(populate_existing=True)))
                 if row.processed_at is not None:
                     return "duplicate"
                 new_id = row.id  # seen but never finished (crash): re-apply (all steps are idempotent)
@@ -163,7 +164,7 @@ class PaymentService:
     async def _process(self, event_row_id: uuid.UUID, ev: WebhookEvent) -> str:
         post: list[Awaitable[Any]] = []
         async with transactional(self.session):  # 2) apply atomically
-            ev_row = await self.session.get(PaymentEvent, event_row_id, with_for_update=True, populate_existing=True)
+            ev_row = must(await self.session.get(PaymentEvent, event_row_id, with_for_update=True, populate_existing=True))
             if ev_row.processed_at is not None:  # concurrent delivery of the same event finished first
                 return "duplicate"
             outcome = await self._apply(ev, ev_row, post)
@@ -195,8 +196,8 @@ class PaymentService:
         if payment is None:
             log.warning("webhook_unmatched", type=ev.type)
             return "unmatched"
-        order = await self.order_repo.get_for_update(payment.order_id)  # lock order BEFORE payment
-        payment = await self.payments.get_for_update(payment.id)
+        order = must(await self.order_repo.get_for_update(payment.order_id))  # lock order BEFORE payment
+        payment = must(await self.payments.get_for_update(payment.id))
         # Assign the FK only AFTER both locks are held: the FK check takes a KEY SHARE lock on the payment row, which
         # would otherwise be acquired before the order lock and deadlock against another webhook (lock-order inversion).
         ev_row.payment_id = payment.id
@@ -206,10 +207,10 @@ class PaymentService:
             return await self._failed(ev, payment, order, post)
         if refund is None:
             return "unmatched"
-        refund = await self.payments.get_refund(refund.id)
+        refund = must(await self.payments.get_refund(refund.id))
         return await self._refund_event(ev, refund, payment, order)
 
-    async def _captured(self, ev: WebhookEvent, p: Payment, order, post) -> str:  # noqa: ANN001
+    async def _captured(self, ev: WebhookEvent, p: Payment, order, post) -> str:
         if ev.amount_paise != p.amount_paise or (ev.currency or p.currency) != p.currency:
             self.audit.record(action="payment.amount_mismatch", entity_type="payment", entity_id=p.id, actor=SYSTEM_ACTOR,
                               metadata={"expected_paise": p.amount_paise, "received_paise": ev.amount_paise,
@@ -240,7 +241,7 @@ class PaymentService:
             return "applied_auto_refund"
         return "applied"
 
-    async def _failed(self, ev: WebhookEvent, p: Payment, order, post: list[Awaitable[Any]]) -> str:  # noqa: ANN001
+    async def _failed(self, ev: WebhookEvent, p: Payment, order, post: list[Awaitable[Any]]) -> str:
         if p.status in PAID_LIKE:
             return "ignored_stale"  # out-of-order: a later success already won
         if p.status == PaymentStatus.FAILED:
@@ -268,7 +269,7 @@ class PaymentService:
         self.session.add(r)
         return r
 
-    async def _complete_refund(self, r: Refund, p: Payment, order) -> None:  # noqa: ANN001
+    async def _complete_refund(self, r: Refund, p: Payment, order) -> None:
         r.status = RefundStatus.COMPLETED
         await self.session.flush()
         done = await self.payments.refund_total(p.id, [RefundStatus.COMPLETED])
@@ -285,7 +286,7 @@ class PaymentService:
         self.notify.add(p.payer_id, NotificationType.SYSTEM, "Refund processed", f"Rs {paise_to_rupees(r.amount_paise)} has been refunded.",
                         {"payment_id": str(p.id), "refund_id": str(r.id), "kind": "refund"})
 
-    async def _resolve_dispute_after_refund(self, r: Refund, order) -> None:  # noqa: ANN001
+    async def _resolve_dispute_after_refund(self, r: Refund, order) -> None:
         """Lock order: order -> payment -> dispute (the same order DisputeService uses)."""
         d = await self.session.get(Dispute, r.dispute_id, with_for_update=True, populate_existing=True)
         if d is None or d.status != DisputeStatus.REFUND_REQUIRED:
@@ -311,7 +312,7 @@ class PaymentService:
                                         f"Refund {str(r.id)[:8]} for payment {str(p.id)[:8]} failed ({reason}); manual follow-up needed.",
                                         {"refund_id": str(r.id)})
 
-    async def _refund_event(self, ev: WebhookEvent, r: Refund, p: Payment, order) -> str:  # noqa: ANN001
+    async def _refund_event(self, ev: WebhookEvent, r: Refund, p: Payment, order) -> str:
         if r.status in {RefundStatus.COMPLETED, RefundStatus.FAILED}:
             return "already_applied"
         if ev.type == "refund.processed":
@@ -327,8 +328,8 @@ class PaymentService:
             p0 = await self.payments.get(payment_id)
             if p0 is None:
                 raise NotFoundError("Payment not found")
-            order = await self.order_repo.get_for_update(p0.order_id)
-            p = await self.payments.get_for_update(payment_id)
+            order = must(await self.order_repo.get_for_update(p0.order_id))
+            p = must(await self.payments.get_for_update(payment_id))
             if p.status not in {PaymentStatus.SUCCESS, PaymentStatus.REFUND_REQUESTED}:
                 raise ConflictError(f"A {p.status.value} payment cannot be refunded")
             if order.status not in {OrderStatus.DISPUTED, OrderStatus.CANCELLED}:
@@ -348,19 +349,19 @@ class PaymentService:
         return await self.payments.get_refund(rid)  # type: ignore[return-value]
 
     async def _dispatch_refund(self, refund_id: uuid.UUID) -> None:
-        r = await self.payments.get_refund(refund_id)
+        r = must(await self.payments.get_refund(refund_id))
         p = await self.payments.get(r.payment_id)  # type: ignore[union-attr]
         try:
             pr = await self.provider.create_refund(provider_payment_id=p.provider_payment_id or "", amount_paise=r.amount_paise,  # type: ignore[union-attr]
                                                    notes={"refund_id": str(refund_id)})
         except ProviderError:
             async with transactional(self.session):
-                order = await self.order_repo.get_for_update(p.order_id)  # type: ignore[union-attr]
+                order = must(await self.order_repo.get_for_update(p.order_id))  # type: ignore[union-attr]
                 p = await self.payments.get_for_update(p.id)  # type: ignore[union-attr]
                 await self._fail_refund(await self.payments.get_refund(refund_id), p, "provider_error")  # type: ignore[arg-type]
             raise
         async with transactional(self.session):
-            order = await self.order_repo.get_for_update(p.order_id)  # type: ignore[union-attr]
+            order = must(await self.order_repo.get_for_update(p.order_id))  # type: ignore[union-attr]
             p = await self.payments.get_for_update(p.id)  # type: ignore[union-attr]
             r = await self.payments.get_refund(refund_id)  # type: ignore[assignment]
             r.provider_refund_id, r.status = pr.provider_refund_id, RefundStatus.PROCESSING  # type: ignore[union-attr]

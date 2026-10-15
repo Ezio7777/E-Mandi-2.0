@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "http://localhost:3000"
     CORS_ORIGINS: str = "http://localhost:3000"
     DEMO_MODE: bool = False
+    MAX_REQUEST_BYTES: int = 10 * 1024 * 1024  # app-level body cap (5 MB image/audio limits + multipart overhead)
     API_V1_PREFIX: str = "/api/v1"
 
     # Data stores
@@ -38,6 +39,10 @@ class Settings(BaseSettings):
     OTP_TTL_SECONDS: int = 300
     OTP_MAX_ATTEMPTS: int = 5
     OTP_LENGTH: int = 6
+    SMS_PROVIDER: Literal["auto", "console", "sns"] = "auto"  # auto: console in dev, NOT configured in production
+    SMS_SENDER_ID: str = ""                                    # DLT-registered header (India); optional elsewhere
+    SMS_AWS_REGION: str = ""                                   # SNS region for SMS (default AWS_REGION)
+    SMS_TEMPLATE: str = "Your E-MANDI verification code is {code}. It expires in {minutes} minutes. Do not share it."
 
     # Google OIDC
     GOOGLE_CLIENT_ID: str = ""
@@ -56,6 +61,9 @@ class Settings(BaseSettings):
     IMAGE_MAX_BYTES: int = 5 * 1024 * 1024
     IMAGE_MIN_DIMENSION: int = 200
     IMAGE_MAX_DIMENSION: int = 8000
+    DOCUMENT_MAX_BYTES: int = 5 * 1024 * 1024
+    DOCUMENT_MAX_PAGES: int = 20
+    DOCUMENT_MAX_PER_LISTING: int = 5
 
     # AI providers (model names are ALWAYS configuration)
     GEMINI_API_KEY: SecretStr = SecretStr("")
@@ -152,6 +160,13 @@ class Settings(BaseSettings):
         if self.ENVIRONMENT == "production":
             if secret in _INSECURE_JWT_SECRETS or len(secret) < 32:
                 raise ValueError("JWT_SECRET must be a random string of >= 32 chars in production")
+            if self.SMS_PROVIDER == "console":
+                raise ValueError("SMS_PROVIDER=console must not be used in production (it logs OTP codes)")
+            if "change-me" in self.DATABASE_URL:
+                raise ValueError("DATABASE_URL still contains the placeholder password in production")
+            if self.PAYMENT_PROVIDER == "razorpay" and not (
+                    self.PAYMENT_KEY_ID and self.PAYMENT_KEY_SECRET.get_secret_value() and self.PAYMENT_WEBHOOK_SECRET.get_secret_value()):
+                raise ValueError("PAYMENT_KEY_ID, PAYMENT_KEY_SECRET and PAYMENT_WEBHOOK_SECRET are required for the razorpay provider")
         elif secret in _INSECURE_JWT_SECRETS:
             # Dev/test convenience only. Never reachable in production (checked above).
             object.__setattr__(self, "JWT_SECRET", SecretStr("dev-only-insecure-secret-not-for-prod-0000"))

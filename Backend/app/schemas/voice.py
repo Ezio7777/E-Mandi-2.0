@@ -1,7 +1,9 @@
 import re
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import ConfigDict, Field, field_validator
+
+from app.schemas.common import CamelModel
 
 Lang = Literal["en", "hi", "kn"]
 SESSION_ID_RX = re.compile(r"^[A-Za-z0-9_-]{8,64}$")
@@ -13,7 +15,7 @@ def _check_session(v: str | None) -> str | None:
     return v
 
 
-class VoiceTextIn(BaseModel):
+class VoiceTextIn(CamelModel):
     """A typed question (the same pipeline as audio, minus transcription)."""
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     text: str = Field(min_length=1, max_length=2000)  # service enforces VOICE_MAX_TEXT_CHARS (configurable)
@@ -24,7 +26,7 @@ class VoiceTextIn(BaseModel):
     _s = field_validator("session_id")(_check_session)
 
 
-class SourceOut(BaseModel):
+class SourceOut(CamelModel):
     type: Literal["market_report", "pricing", "listing", "inventory"]
     title: str
     detail: str
@@ -32,20 +34,20 @@ class SourceOut(BaseModel):
     is_sample: bool = False
 
 
-class ToolCallOut(BaseModel):
+class ToolCallOut(CamelModel):
     tool: str
     ok: bool
     rows: int
     ms: int
 
 
-class AudioOut(BaseModel):
+class AudioOut(CamelModel):
     mime: str
     data_base64: str
     provider: str
 
 
-class VoiceAnswerOut(BaseModel):
+class VoiceAnswerOut(CamelModel):
     session_id: str
     transcript: str
     language: Lang                     # language of the ANSWER
@@ -62,12 +64,12 @@ class VoiceAnswerOut(BaseModel):
     execution_id: str
 
 
-class VoiceTurn(BaseModel):
+class VoiceTurn(CamelModel):
     role: Literal["user", "assistant"]
     text: str
 
 
-class VoiceSessionOut(BaseModel):
+class VoiceSessionOut(CamelModel):
     session_id: str
     turns: list[VoiceTurn]
     crop: str | None

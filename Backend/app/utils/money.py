@@ -21,4 +21,4 @@ def line_total_paise(quantity_kg: Decimal, unit_price_paise: int) -> int:
 def fmt_kg(value: Decimal) -> str:
     """Human-friendly quantity: Decimal('200.000') -> '200', Decimal('12.500') -> '12.5' (never scientific notation)."""
     d = Decimal(value).normalize()
-    return f"{d:f}" if d == d.to_integral_value() or d.as_tuple().exponent < 0 else f"{d.quantize(Decimal(1)):f}"
+    return f"{d:f}" if d == d.to_integral_value() or (isinstance(exp := d.as_tuple().exponent, int) and exp < 0) else f"{d.quantize(Decimal(1)):f}"

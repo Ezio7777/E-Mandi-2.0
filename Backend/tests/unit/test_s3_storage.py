@@ -3,11 +3,10 @@ import json
 
 import boto3
 import pytest
-from moto import mock_aws
-
 from app.core.config import Settings
 from app.core.errors import ProviderError
 from app.integrations.aws.s3 import S3Storage
+from moto import mock_aws
 
 S = Settings(ENVIRONMENT="test", AWS_S3_BUCKET="emandi-test", AWS_REGION="ap-south-1",
              JWT_SECRET="unit-test-secret-unit-test-secret-000000")
@@ -45,7 +44,7 @@ async def test_presigned_post_policy_enforces_size_type_key(storage):
     assert {"Content-Type": "image/jpeg"} in conds
     assert {"x-amz-server-side-encryption": "AES256"} in conds
     assert {"key": "e-mandi/listings/x/y.jpg"} in conds
-    assert "emandi-test" in p.url and "AWSAccessKeyId" in p.fields or "x-amz-credential" in p.fields
+    assert ("emandi-test" in p.url and "AWSAccessKeyId" in p.fields) or "x-amz-credential" in p.fields
 
 
 async def test_presigned_get_url(storage):

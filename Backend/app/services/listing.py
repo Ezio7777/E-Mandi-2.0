@@ -10,9 +10,8 @@ from app.core.database import transactional
 from app.core.errors import ConflictError, ForbiddenError, NotFoundError
 from app.core.logging import get_logger
 from app.integrations.aws.image_url_resolver import ImageUrlResolver
-from app.models.enums import AgentName
+from app.models.enums import AgentName, UserRole
 from app.models.enums import ListingStatus as L
-from app.models.enums import UserRole
 from app.models.listing import Listing
 from app.models.user import User
 from app.repositories.image import ImageRepository
@@ -45,7 +44,7 @@ class ListingService:
             reserved_kg=l.reserved_kg, available_kg=l.available_kg, base_price=paise_to_rupees(l.base_price_paise),
             suggested_price=paise_to_rupees(l.suggested_price_paise) if l.suggested_price_paise else None,
             ai_grade=l.ai_grade, grade_confidence=l.grade_confidence, status=l.status, location=l.location,
-            state=l.state, harvest_date=l.harvest_date, primary_image_url=url, image_count=len(l.images),
+            state=l.state, harvest_date=l.harvest_date, primary_image_url=url, image_count=len(l.images), verified_document_count=len(l.verified_documents),
             created_at=l.created_at, updated_at=l.updated_at)
 
     async def create(self, user: User, data: ListingCreate, ctx: RequestContext) -> Listing:
@@ -122,7 +121,7 @@ class ListingService:
         if self.enqueue_grading:  # only AFTER commit so the worker never sees uncommitted state
             try:
                 await self.enqueue_grading(listing_id, execution_id)
-            except Exception as exc:  # noqa: BLE001  (queue outage must not fail the request)
+            except Exception as exc:
                 # Listing stays ANALYZING; the stuck-listing sweeper (Stage 17) re-enqueues it.
                 log.error("grading_enqueue_failed", listing_id=str(listing_id), error=str(exc))
         return await self._reload(listing_id), execution_id

@@ -23,7 +23,7 @@ async def ready(request: Request, response: Response) -> dict:
         async with get_sessionmaker()() as s:
             await s.execute(text("SELECT 1"))
         checks["database"] = "ok"
-    except Exception:  # noqa: BLE001
+    except Exception:
         checks["database"] = "fail"
     try:
         redis = request.app.state.redis
@@ -34,7 +34,7 @@ async def ready(request: Request, response: Response) -> dict:
             checks["worker"] = "no_heartbeat"
         else:
             checks["worker"] = "ok" if time.time() - float(beat) < WORKER_STALE_AFTER_SECONDS else "stale"
-    except Exception:  # noqa: BLE001
+    except Exception:
         checks["redis"] = "fail"
         checks["worker"] = "unknown"
     # Worker is reported but only DB + Redis gate readiness (API can serve without the worker).

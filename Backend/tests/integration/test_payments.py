@@ -3,28 +3,29 @@ import json
 import uuid
 from datetime import timedelta
 
-import pytest
-from sqlalchemy import select
-
 from app.core.config import Settings, get_settings
 from app.core.database import get_sessionmaker
 from app.core.errors import ProviderError
 from app.integrations.payments.mock import MockPaymentProvider
 from app.models.audit_log import AuditLog
 from app.models.enums import (
-    ListingStatus, NotificationType, OrderStatus, PaymentStatus, RefundStatus,
+    ListingStatus,
+    NotificationType,
+    OrderStatus,
+    PaymentStatus,
+    RefundStatus,
 )
-from app.models.listing import Listing
 from app.models.notification import Notification
-from app.models.order import Order
 from app.models.payment import Payment
 from app.models.payment_event import PaymentEvent
 from app.models.refund import Refund
 from app.services.payment import PaymentService
 from app.utils.time import utcnow
+from sqlalchemy import select
+
 from tests.integration.conftest import bearer
 from tests.integration.test_grading import make_admin
-from tests.integration.test_matching_agent import buyer, db_farmer, farmer, mk
+from tests.integration.test_matching_agent import buyer, farmer, mk
 from tests.integration.test_orders import listing_row, order_row, place
 
 P = "/api/v1/payments"
@@ -463,3 +464,42 @@ async def test_payment_visibility_rules(app_ctx, client, db):
     lst = (await client.get(f"{P}/order/{c['oid']}", headers=c["bh"])).json()["data"]
     assert len(lst) == 1 and lst[0]["id"] == c["pid"]
     assert (await client.get(f"{P}/{c['pid']}")).status_code == 401
+
+
+# ------------------------------------------------------------------ refund auto-restock
+async def test_full_refund_restocks_inventory_once_and_reactivates_sold_out_listing(app_ctx, client, db):
+    admin = await make_admin(db, client)
+    c = await paid_disputed(client, app_ctx, db, qty=500, order_kg=500)
+    l = await listing_row(db, c["lid"])
+    assert (l.quantity_kg, l.reserved_kg, l.status) == (0, 0, ListingStatus.SOLD)
+    r = await client.post(f"{P}/{c['pid']}/refunds", json={"reason": "goods spoiled on delivery"}, headers=admin)
+    assert r.status_code == 201
+    await db.rollback()
+    l = await listing_row(db, c["lid"])
+    assert (l.quantity_kg, l.reserved_kg, l.status) == (500, 0, ListingStatus.ACTIVE)
+    o = await order_row(db, c["oid"])
+    assert o.status == OrderStatus.REFUNDED and o.stock_committed_at is not None and o.restocked_at is not None
+    assert (await actions(db, "order")).count("order.restocked") == 1
+    assert (await db.scalars(select(Notification).where(Notification.title == "Stock restored", Notification.user_id == c["f1"]))).one()
+
+
+async def test_partial_refund_does_not_restock(app_ctx, client, db):
+    admin = await make_admin(db, client)
+    c = await paid_disputed(client, app_ctx, db)
+    await client.post(f"{P}/{c['pid']}/refunds", json={"amount": 5000.00, "reason": "partial damage claim"}, headers=admin)
+    await db.rollback()
+    assert (await listing_row(db, c["lid"])).quantity_kg == 300
+    assert (await order_row(db, c["oid"])).restocked_at is None
+
+
+async def test_restock_is_idempotent(app_ctx, client, db):
+    admin = await make_admin(db, client)
+    c = await paid_disputed(client, app_ctx, db)
+    await client.post(f"{P}/{c['pid']}/refunds", json={"reason": "goods spoiled on delivery"}, headers=admin)
+    await db.rollback()
+    o = await order_row(db, c["oid"])
+    first = o.restocked_at
+    assert (await client.post(f"{P}/{c['pid']}/refunds", json={"reason": "again please"}, headers=admin)).status_code == 409
+    await db.rollback()
+    assert (await listing_row(db, c["lid"])).quantity_kg == 800
+    assert (await order_row(db, c["oid"])).restocked_at == first

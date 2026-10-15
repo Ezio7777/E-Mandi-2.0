@@ -32,6 +32,7 @@ from app.services.notification import NotificationService
 from app.services.transitions import ORDER_TRANSITIONS, assert_transition
 from app.utils.hashing import canonical_hash
 from app.utils.money import fmt_kg, line_total_paise, paise_to_rupees
+from app.utils.must import must
 from app.utils.pagination import decode_cursor, encode_cursor
 from app.utils.time import utcnow
 
@@ -112,9 +113,9 @@ class OrderService:
                     expires_at=utcnow() + IDEM_TTL).on_conflict_do_nothing(constraint="uq_idempotency_user_scope_key")
                     .returning(IdempotencyKey.id))).scalar_one_or_none()
                 if idem_id is None:  # key seen before (a concurrent first request has already committed)
-                    row = await self.session.scalar(select(IdempotencyKey).where(
+                    row = must(await self.session.scalar(select(IdempotencyKey).where(
                         IdempotencyKey.user_id == user.id, IdempotencyKey.scope == IDEM_SCOPE, IdempotencyKey.key == idem_key)
-                        .execution_options(populate_existing=True))
+                        .execution_options(populate_existing=True)))
                     if row.request_hash != req_hash:
                         raise IdempotencyConflict()
                     oid = (row.response_body or {}).get("order_id")
@@ -167,7 +168,7 @@ class OrderService:
                             f"{user.full_name} ordered {', '.join(f'{fmt_kg(i.quantity_kg)} kg {listings[i.listing_id].crop_name}' for i in o.items)} "
                             f"(Rs {paise_to_rupees(total)}).", {"order_id": str(o.id)})
             if idem_id:
-                row = await self.session.get(IdempotencyKey, idem_id)
+                row = must(await self.session.get(IdempotencyKey, idem_id))
                 row.response_status, row.response_body = 201, {"order_id": str(o.id)}
             oid = o.id
         return await self.orders.get(oid), True  # type: ignore[return-value]
@@ -250,6 +251,20 @@ class OrderService:
         if o.status not in {OrderStatus.DISPUTED, OrderStatus.CANCELLED}:
             return False
         self._transition(o, OrderStatus.REFUNDED, SYSTEM_ACTOR)
+        await self._restock_locked(o)
+        return True
+
+    async def _restock_locked(self, o: Order) -> bool:
+        """Full refund returns the sold stock to the listings, exactly once. Orders whose sale was never committed
+        (late-payment auto-refund on an already-cancelled order) have nothing to return."""
+        if o.stock_committed_at is None or o.restocked_at is not None:
+            return False
+        await self.inventory.restock_many(self._release_payload(o))
+        o.restocked_at = utcnow()
+        self.audit.record(action="order.restocked", entity_type="order", entity_id=o.id, actor=SYSTEM_ACTOR,
+                          metadata={"items": [{"listing_id": str(i.listing_id), "quantity_kg": str(i.quantity_kg)} for i in o.items]})
+        self.notify.add(o.farmer_id, NotificationType.SYSTEM, "Stock restored",
+                        f"Order {str(o.id)[:8]} was fully refunded; its quantity is back in your inventory.", {"order_id": str(o.id)})
         return True
 
     async def apply_paid_locked(self, o: Order) -> str:
@@ -263,6 +278,7 @@ class OrderService:
         if o.status != OrderStatus.PAYMENT_PENDING:
             return "late"
         await self.inventory.commit_sale_many(self._release_payload(o))
+        o.stock_committed_at = utcnow()
         self._transition(o, OrderStatus.PAID, SYSTEM_ACTOR, total_amount_paise=o.total_amount_paise)
         o.reservation_expires_at = None
         self.notify.add(o.farmer_id, NotificationType.PAYMENT_SUCCESSFUL, "Payment received",

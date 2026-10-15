@@ -8,6 +8,7 @@ from redis.asyncio import Redis
 
 from app import __version__
 from app.api.router import api_router, health_router
+from app.core.body_limit import MaxBodySizeMiddleware
 from app.core.config import get_settings
 from app.core.database import dispose_engine
 from app.core.errors import register_exception_handlers
@@ -49,6 +50,7 @@ def create_app() -> FastAPI:
         expose_headers=["X-Request-ID", "Retry-After"],
     )
     app.add_middleware(RequestIDMiddleware)
+    app.add_middleware(MaxBodySizeMiddleware, max_bytes=s.MAX_REQUEST_BYTES)  # outermost: rejects before anything reads the body
     register_exception_handlers(app)
     app.include_router(health_router)
     app.include_router(api_router, prefix=s.API_V1_PREFIX)

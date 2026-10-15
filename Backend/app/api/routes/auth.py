@@ -4,14 +4,26 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 
 from app.core.dependencies import (
-    CurrentUser, RedisDep, RequestContextDep, SessionDep, SettingsDep, get_google_verifier, get_otp_sender,
+    CurrentUser,
+    RedisDep,
+    RequestContextDep,
+    SessionDep,
+    SettingsDep,
+    get_google_verifier,
+    get_otp_sender,
 )
 from app.core.rate_limit import rate_limit
 from app.integrations.google.oidc import GoogleIdentityVerifier
 from app.integrations.sms import OTPSender
 from app.schemas.auth import (
-    GoogleLoginRequest, LoginRequest, OtpChallengeOut, OtpRequest, OtpVerifyRequest, RefreshRequest,
-    RegisterRequest, TokenResponse,
+    GoogleLoginRequest,
+    LoginRequest,
+    OtpChallengeOut,
+    OtpRequest,
+    OtpVerifyRequest,
+    RefreshRequest,
+    RegisterRequest,
+    TokenResponse,
 )
 from app.schemas.common import Envelope
 from app.services.auth import AuthResult, AuthService

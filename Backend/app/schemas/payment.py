@@ -3,19 +3,20 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import ConfigDict, Field, field_validator
 
 from app.models.enums import PaymentStatus, RefundStatus
+from app.schemas.common import CamelModel
 from app.schemas.listing import Rupees
 
 
-class PaymentCreate(BaseModel):
+class PaymentCreate(CamelModel):
     """No amount field on purpose: the backend always charges the order's server-computed total."""
     model_config = ConfigDict(extra="forbid")
     order_id: uuid.UUID
 
 
-class CheckoutOut(BaseModel):
+class CheckoutOut(CamelModel):
     provider: str
     key_id: str  # PUBLIC key id only (never a secret)
     provider_order_id: str
@@ -24,7 +25,7 @@ class CheckoutOut(BaseModel):
     currency: str
 
 
-class RefundOut(BaseModel):
+class RefundOut(CamelModel):
     id: uuid.UUID
     amount: Rupees
     status: RefundStatus
@@ -32,7 +33,7 @@ class RefundOut(BaseModel):
     created_at: datetime
 
 
-class PaymentOut(BaseModel):
+class PaymentOut(CamelModel):
     id: uuid.UUID
     order_id: uuid.UUID
     status: PaymentStatus
@@ -46,7 +47,7 @@ class PaymentOut(BaseModel):
     refunds: list[RefundOut] = []
 
 
-class RefundCreate(BaseModel):
+class RefundCreate(CamelModel):
     model_config = ConfigDict(extra="forbid")
     amount: Decimal | None = None  # rupees; omitted = refund the full remaining amount
     reason: str = Field(min_length=5, max_length=500)
@@ -59,10 +60,10 @@ class RefundCreate(BaseModel):
         return v
 
 
-class SimulateRequest(BaseModel):
+class SimulateRequest(CamelModel):
     model_config = ConfigDict(extra="forbid")
     outcome: Literal["success", "failure"]
 
 
-class WebhookAck(BaseModel):
+class WebhookAck(CamelModel):
     status: str

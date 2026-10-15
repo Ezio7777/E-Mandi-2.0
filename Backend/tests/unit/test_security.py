@@ -2,11 +2,15 @@ import uuid
 
 import jwt
 import pytest
-
 from app.core.config import Settings
 from app.core.errors import UnauthorizedError
 from app.core.security import (
-    create_access_token, decode_access_token, generate_otp, hash_otp, hash_password, hash_token,
+    create_access_token,
+    decode_access_token,
+    generate_otp,
+    hash_otp,
+    hash_password,
+    hash_token,
     verify_password,
 )
 
@@ -52,4 +56,4 @@ def test_production_config_guards():
         Settings(ENVIRONMENT="production", JWT_SECRET="short")
     with pytest.raises(ValueError):
         Settings(ENVIRONMENT="test", CORS_ORIGINS="*")
-    assert Settings(ENVIRONMENT="production", JWT_SECRET="x" * 40).is_production
+    assert Settings(ENVIRONMENT="production", JWT_SECRET="x" * 40, DATABASE_URL="postgresql+asyncpg://u:realpw@db/x").is_production

@@ -2,13 +2,14 @@ import uuid
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import ConfigDict, Field, field_validator
 
 from app.models.enums import Grade, RequirementStatus
+from app.schemas.common import CamelModel
 from app.schemas.listing import Kg, Rupees, _check_price, _check_qty
 
 
-class RequirementCreate(BaseModel):
+class RequirementCreate(CamelModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     crop_name: str = Field(min_length=2, max_length=120)
     quantity_kg: Decimal
@@ -29,7 +30,7 @@ class RequirementCreate(BaseModel):
         return v
 
 
-class RequirementOut(BaseModel):
+class RequirementOut(CamelModel):
     id: uuid.UUID
     crop_name: str
     quantity_kg: Kg

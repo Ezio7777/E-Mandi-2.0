@@ -1,33 +1,33 @@
 import uuid
 from datetime import datetime
-from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
 
 from app.models.enums import NotificationType
+from app.schemas.common import CamelBlob, CamelModel
 
 
-class NotificationOut(BaseModel):
+class NotificationOut(CamelModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     type: NotificationType
     title: str
     body: str
-    data: dict[str, Any]
+    data: CamelBlob
     is_read: bool
     read_at: datetime | None
     created_at: datetime
 
 
-class NotificationPage(BaseModel):
+class NotificationPage(CamelModel):
     items: list[NotificationOut]
     next_cursor: str | None
     unread_count: int
 
 
-class UnreadCount(BaseModel):
+class UnreadCount(CamelModel):
     unread_count: int
 
 
-class MarkedRead(BaseModel):
+class MarkedRead(CamelModel):
     marked: int

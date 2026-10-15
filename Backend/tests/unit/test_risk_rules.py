@@ -3,7 +3,6 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
-
 from app.agents.fraud_risk import rules as R
 from app.agents.fraud_risk.summarizer import validate_summary
 from app.core.config import get_settings

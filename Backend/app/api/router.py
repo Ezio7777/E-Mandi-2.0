@@ -2,7 +2,28 @@
 from fastapi import APIRouter
 
 from app.api.routes import (
-    admin, analytics, audit, auth, demo, disputes, grading, health, images, inventory, listings, market, matching, notifications, orders, payments, pricing, requirements, uploads, users, voice,
+    admin,
+    analytics,
+    audit,
+    auth,
+    demo,
+    disputes,
+    documents,
+    grading,
+    health,
+    images,
+    inventory,
+    listings,
+    market,
+    matching,
+    notifications,
+    orders,
+    payments,
+    pricing,
+    requirements,
+    uploads,
+    users,
+    voice,
 )
 
 api_router = APIRouter()  # mounted under /api/v1 by main.py
@@ -13,6 +34,7 @@ api_router.include_router(analytics.router)
 api_router.include_router(demo.router)
 api_router.include_router(users.router)
 api_router.include_router(images.router)
+api_router.include_router(documents.router)
 api_router.include_router(listings.router)
 api_router.include_router(inventory.router)
 api_router.include_router(grading.router)

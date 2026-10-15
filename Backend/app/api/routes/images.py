@@ -4,14 +4,24 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 
 from app.core.dependencies import (
-    CurrentUser, RequestContextDep, SessionDep, SettingsDep, get_storage, get_url_resolver,
+    CurrentUser,
+    RequestContextDep,
+    SessionDep,
+    SettingsDep,
+    get_storage,
+    get_url_resolver,
 )
 from app.core.rate_limit import rate_limit
 from app.integrations.aws.image_url_resolver import ImageUrlResolver
 from app.integrations.aws.s3 import ObjectStorage
 from app.schemas.common import Envelope
 from app.schemas.image import (
-    AvatarOut, ImageOut, ProfileUploadInitRequest, UploadConfirmRequest, UploadInitRequest, UploadInitResponse,
+    AvatarOut,
+    ImageOut,
+    ProfileUploadInitRequest,
+    UploadConfirmRequest,
+    UploadInitRequest,
+    UploadInitResponse,
 )
 from app.services.image import ImageService
 

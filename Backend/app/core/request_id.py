@@ -23,7 +23,7 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, hsts: bool = False) -> None:  # noqa: ANN001
+    def __init__(self, app, hsts: bool = False) -> None:
         super().__init__(app)
         self.hsts = hsts
 

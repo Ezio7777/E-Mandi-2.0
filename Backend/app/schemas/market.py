@@ -3,8 +3,9 @@ from datetime import date, timedelta
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import ConfigDict, Field, field_validator, model_validator
 
+from app.schemas.common import CamelModel
 from app.schemas.listing import Rupees
 
 
@@ -16,7 +17,7 @@ def _price(v: Decimal) -> Decimal:
     return v
 
 
-class MarketReportIn(BaseModel):
+class MarketReportIn(CamelModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     crop: str = Field(min_length=2, max_length=120)
     location: str = Field(min_length=2, max_length=200)
@@ -44,12 +45,12 @@ class MarketReportIn(BaseModel):
         return self
 
 
-class MarketReportsUpsert(BaseModel):
+class MarketReportsUpsert(CamelModel):
     model_config = ConfigDict(extra="forbid")
     reports: list[MarketReportIn] = Field(min_length=1, max_length=500)
 
 
-class MarketReportOut(BaseModel):
+class MarketReportOut(CamelModel):
     id: uuid.UUID
     crop: str
     location: str
@@ -62,17 +63,17 @@ class MarketReportOut(BaseModel):
     is_sample: bool
 
 
-class MarketSearchHit(BaseModel):
+class MarketSearchHit(CamelModel):
     report: MarketReportOut
     similarity: float | None = None
 
 
-class MarketSearchOut(BaseModel):
+class MarketSearchOut(CamelModel):
     mode: Literal["semantic", "keyword"]
     crop: str | None
     hits: list[MarketSearchHit]
 
 
-class UpsertResult(BaseModel):
+class UpsertResult(CamelModel):
     upserted: int
     embedding_job_queued: bool

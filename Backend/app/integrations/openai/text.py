@@ -16,7 +16,7 @@ class OpenAITextLLM:
     def __init__(self, settings: Settings, client: Any | None = None) -> None:
         self.model, self.timeout = settings.OPENAI_TEXT_MODEL, settings.AI_PROVIDER_TIMEOUT_SECONDS
         key = settings.OPENAI_API_KEY.get_secret_value()
-        self.client = client or (AsyncOpenAI(api_key=key, timeout=self.timeout) if (key and self.model) else None)
+        self.client: Any = client or (AsyncOpenAI(api_key=key, timeout=self.timeout) if (key and self.model) else None)
 
     @property
     def available(self) -> bool:
@@ -30,8 +30,8 @@ class OpenAITextLLM:
                 model=self.model, response_format={"type": "json_object"},
                 messages=[{"role": "system", "content": system}, {"role": "user", "content": user}]), self.timeout)
             return resp.choices[0].message.content or ""
-        except (TimeoutError, asyncio.TimeoutError) as exc:
+        except TimeoutError as exc:
             raise LLMProviderError("timeout", self.name) from exc
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning("openai_text_failed", error_type=type(exc).__name__)
             raise LLMProviderError("api_error", self.name) from exc

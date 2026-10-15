@@ -7,7 +7,10 @@ from openai import AsyncOpenAI
 from app.core.config import Settings
 from app.core.logging import get_logger
 from app.integrations.vision_common import (
-    SYSTEM_PROMPT, GradingProviderError, parse_raw_grading, user_prompt,
+    SYSTEM_PROMPT,
+    GradingProviderError,
+    parse_raw_grading,
+    user_prompt,
 )
 from app.schemas.grading import RawGrading
 
@@ -22,7 +25,7 @@ class OpenAIVisionGrader:
         self.timeout = settings.AI_PROVIDER_TIMEOUT_SECONDS
         key = settings.OPENAI_API_KEY.get_secret_value()
         self._configured = bool(key and self.model)
-        self.client = client or (AsyncOpenAI(api_key=key, timeout=self.timeout) if self._configured else None)
+        self.client: Any = client or (AsyncOpenAI(api_key=key, timeout=self.timeout) if self._configured else None)
 
     @property
     def available(self) -> bool:
@@ -40,9 +43,9 @@ class OpenAIVisionGrader:
                                                        {"type": "image_url", "image_url": {"url": data_url}}]}]),
                 timeout=self.timeout)
             text = resp.choices[0].message.content or ""
-        except (TimeoutError, asyncio.TimeoutError) as exc:
+        except TimeoutError as exc:
             raise GradingProviderError("timeout", self.name) from exc
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning("openai_call_failed", error_type=type(exc).__name__)
             raise GradingProviderError("api_error", self.name) from exc
         return parse_raw_grading(text, self.name)

@@ -1,0 +1,293 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  E-MANDI 2.0 backend - single always-on EC2 host (Docker Compose + Caddy HTTPS), private S3 buckets
+  (uploads, ops: backups + releases), least-privilege instance role, SSM Parameter Store for secrets,
+  CloudWatch health alarms. No SSH by default (use SSM Session Manager).
+
+Parameters:
+  DomainName:
+    Type: String
+    Description: API hostname served by Caddy (an A record to the Elastic IP is created outside this stack).
+    AllowedPattern: "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$"
+  FrontendOrigin:
+    Type: String
+    Description: Exact frontend origin allowed to POST uploads to S3 (e.g. https://app.example.com). Never *.
+    AllowedPattern: "^https://[a-z0-9.-]+(:[0-9]+)?$"
+  InstanceType:
+    Type: String
+    Default: t3.small
+    AllowedValues: [t3.small, t3.medium, t3.large, t4g.small, t4g.medium]
+  VolumeSizeGiB:
+    Type: Number
+    Default: 30
+    MinValue: 20
+    MaxValue: 500
+  LatestAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+    Description: Use the -arm64 AMI parameter together with a t4g instance type.
+  SshCidr:
+    Type: String
+    Default: ""
+    Description: Optional. Your office/home CIDR to open port 22. Empty (recommended) = no SSH, use Session Manager.
+    AllowedPattern: "^$|^([0-9]{1,3}\\.){3}[0-9]{1,3}/(3[0-2]|[12]?[0-9])$"
+  AlarmEmail:
+    Type: String
+    Description: Receives health/backup alarm e-mails (confirm the SNS subscription).
+  BackupRetentionDays:
+    Type: Number
+    Default: 30
+    MinValue: 7
+  ParameterPrefix:
+    Type: String
+    Default: /emandi/prod
+    Description: SSM Parameter Store path holding the app environment (SecureString for secrets).
+
+Conditions:
+  OpenSsh: !Not [!Equals [!Ref SshCidr, ""]]
+
+Resources:
+  # ------------------------------------------------------------------ storage
+  UploadsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      PublicAccessBlockConfiguration: {BlockPublicAcls: true, BlockPublicPolicy: true, IgnorePublicAcls: true, RestrictPublicBuckets: true}
+      OwnershipControls: {Rules: [{ObjectOwnership: BucketOwnerEnforced}]}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration: [{ServerSideEncryptionByDefault: {SSEAlgorithm: AES256}}]
+      VersioningConfiguration: {Status: Enabled}
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins: [!Ref FrontendOrigin]
+            AllowedMethods: [POST, GET, HEAD]
+            AllowedHeaders: ["*"]
+            ExposedHeaders: [ETag]
+            MaxAge: 3000
+      LifecycleConfiguration:
+        Rules:
+          - {Id: abort-incomplete-multipart, Status: Enabled, AbortIncompleteMultipartUpload: {DaysAfterInitiation: 2}}
+          - {Id: expire-old-versions, Status: Enabled, NoncurrentVersionExpiration: {NoncurrentDays: 30}}
+
+  UploadsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref UploadsBucket
+      PolicyDocument:
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource: [!GetAtt UploadsBucket.Arn, !Sub "${UploadsBucket.Arn}/*"]
+            Condition: {Bool: {"aws:SecureTransport": "false"}}
+
+  OpsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      PublicAccessBlockConfiguration: {BlockPublicAcls: true, BlockPublicPolicy: true, IgnorePublicAcls: true, RestrictPublicBuckets: true}
+      OwnershipControls: {Rules: [{ObjectOwnership: BucketOwnerEnforced}]}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration: [{ServerSideEncryptionByDefault: {SSEAlgorithm: AES256}}]
+      VersioningConfiguration: {Status: Enabled}
+      LifecycleConfiguration:
+        Rules:
+          - {Id: expire-backups, Status: Enabled, Prefix: e-mandi/backups/, ExpirationInDays: !Ref BackupRetentionDays, NoncurrentVersionExpiration: {NoncurrentDays: 7}}
+          - {Id: expire-releases, Status: Enabled, Prefix: releases/, ExpirationInDays: 90, NoncurrentVersionExpiration: {NoncurrentDays: 7}}
+          - {Id: abort-incomplete-multipart, Status: Enabled, AbortIncompleteMultipartUpload: {DaysAfterInitiation: 2}}
+
+  OpsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref OpsBucket
+      PolicyDocument:
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource: [!GetAtt OpsBucket.Arn, !Sub "${OpsBucket.Arn}/*"]
+            Condition: {Bool: {"aws:SecureTransport": "false"}}
+
+  # ------------------------------------------------------------------ identity (least privilege)
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement: [{Effect: Allow, Principal: {Service: ec2.amazonaws.com}, Action: "sts:AssumeRole"}]
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: emandi-app
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: UploadsObjects
+                Effect: Allow
+                Action: [s3:PutObject, s3:GetObject, s3:DeleteObject]
+                Resource: !Sub "${UploadsBucket.Arn}/e-mandi/*"
+              - Sid: UploadsList
+                Effect: Allow
+                Action: s3:ListBucket
+                Resource: !GetAtt UploadsBucket.Arn
+                Condition: {StringLike: {"s3:prefix": ["e-mandi/*"]}}
+              - Sid: OpsObjects
+                Effect: Allow
+                Action: [s3:PutObject, s3:GetObject, s3:DeleteObject]
+                Resource: [!Sub "${OpsBucket.Arn}/e-mandi/backups/*", !Sub "${OpsBucket.Arn}/releases/*"]
+              - Sid: OpsList
+                Effect: Allow
+                Action: s3:ListBucket
+                Resource: !GetAtt OpsBucket.Arn
+                Condition: {StringLike: {"s3:prefix": ["e-mandi/backups/*", "releases/*"]}}
+              - Sid: ReadOwnParameters
+                Effect: Allow
+                Action: [ssm:GetParametersByPath, ssm:GetParameter, ssm:GetParameters]
+                Resource: !Sub "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${ParameterPrefix}*"
+              - Sid: SmsPublish
+                Effect: Allow
+                Action: sns:Publish
+                Resource: "*"   # SMS to a phone number has no resource ARN to scope; spend is capped by the account SMS spending limit
+              - Sid: HealthMetric
+                Effect: Allow
+                Action: cloudwatch:PutMetricData
+                Resource: "*"
+                Condition: {StringEquals: {"cloudwatch:namespace": EMandi}}
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref InstanceRole]
+
+  # ------------------------------------------------------------------ network + compute
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: E-MANDI web (80/443 only; SSH optional and restricted)
+      SecurityGroupIngress:
+        - {IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0, Description: "HTTP (ACME and redirect)"}
+        - {IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0, Description: HTTPS}
+        - !If
+          - OpenSsh
+          - {IpProtocol: tcp, FromPort: 22, ToPort: 22, CidrIp: !Ref SshCidr, Description: Restricted SSH}
+          - !Ref AWS::NoValue
+
+  Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref LatestAmiId
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref InstanceProfile
+      SecurityGroupIds: [!GetAtt SecurityGroup.GroupId]
+      Monitoring: true
+      MetadataOptions: {HttpTokens: required, HttpPutResponseHopLimit: 2, HttpEndpoint: enabled}
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs: {VolumeSize: !Ref VolumeSizeGiB, VolumeType: gp3, Encrypted: true, DeleteOnTermination: false}
+      Tags: [{Key: Name, Value: e-mandi-api}]
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euxo pipefail
+          dnf install -y docker git cronie jq
+          systemctl enable --now docker crond
+          mkdir -p /usr/local/lib/docker/cli-plugins
+          ARCH=$(uname -m)
+          curl -fsSL "https://github.com/docker/compose/releases/download/v2.29.7/docker-compose-linux-$ARCH" -o /usr/local/lib/docker/cli-plugins/docker-compose
+          chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+          mkdir -p /opt/emandi/releases /opt/emandi/shared
+          cat > /opt/emandi/shared/host.env <<'HOSTENV'
+          AWS_REGION=${AWS::Region}
+          OPS_BUCKET=${OpsBucket}
+          UPLOADS_BUCKET=${UploadsBucket}
+          PARAM_PREFIX=${ParameterPrefix}
+          API_DOMAIN=${DomainName}
+          HOSTENV
+          cat > /etc/cron.d/emandi <<'CRON'
+          # health probe every 5 min; DB backup daily 02:15 UTC (see scripts/healthcheck.sh, scripts/backup_db.sh)
+          */5 * * * * root cd /opt/emandi/current 2>/dev/null && bash scripts/healthcheck.sh >> /var/log/emandi-health.log 2>&1
+          15 2 * * * root cd /opt/emandi/current 2>/dev/null && bash scripts/backup_db.sh >> /var/log/emandi-backup.log 2>&1
+          CRON
+          chmod 0644 /etc/cron.d/emandi
+          echo "bootstrap complete: run scripts/release.sh on your machine, then deploy via SSM (docs/AWS_DEPLOYMENT.md)"
+
+  ElasticIp:
+    Type: AWS::EC2::EIP
+    Properties:
+      InstanceId: !Ref Instance
+      Domain: vpc
+
+  # ------------------------------------------------------------------ alerts
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      Subscription: [{Protocol: email, Endpoint: !Ref AlarmEmail}]
+
+  StatusCheckAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Instance or system status check failed - auto-recover the host.
+      Namespace: AWS/EC2
+      MetricName: StatusCheckFailed_System
+      Dimensions: [{Name: InstanceId, Value: !Ref Instance}]
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 2
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic, !Sub "arn:${AWS::Partition}:automate:${AWS::Region}:ec2:recover"]
+
+  CpuAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Sustained high CPU.
+      Namespace: AWS/EC2
+      MetricName: CPUUtilization
+      Dimensions: [{Name: InstanceId, Value: !Ref Instance}]
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 3
+      Threshold: 85
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions: [!Ref AlarmTopic]
+
+  AppUnhealthyAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: scripts/healthcheck.sh reported API/worker/database failures for 3 consecutive probes.
+      Namespace: EMandi
+      MetricName: HealthFailure
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 3
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: breaching   # no probe data (host down / cron dead) is also an incident
+      AlarmActions: [!Ref AlarmTopic]
+
+  BackupMissingAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: No successful DB backup metric in 26 hours.
+      Namespace: EMandi
+      MetricName: BackupSuccess
+      Statistic: Sum
+      Period: 86400
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: breaching
+      AlarmActions: [!Ref AlarmTopic]
+
+Outputs:
+  PublicIp: {Value: !Ref ElasticIp, Description: Point an A record for DomainName here}
+  InstanceId: {Value: !Ref Instance, Description: Use with aws ssm start-session / send-command}
+  UploadsBucketName: {Value: !Ref UploadsBucket, Description: AWS_S3_BUCKET}
+  OpsBucketName: {Value: !Ref OpsBucket, Description: BACKUP_S3_BUCKET and release bundles}
+  ParameterPrefix: {Value: !Ref ParameterPrefix}

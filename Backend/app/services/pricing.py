@@ -15,7 +15,7 @@ from app.core.errors import AppError
 from app.models.enums import Grade
 from app.models.market_report import MarketReport
 from app.repositories.market import MarketRepository
-from app.schemas.pricing import PricingOut, PriceFactorOut
+from app.schemas.pricing import PriceFactorOut, PricingOut
 from app.utils.crops import crop_or_title, normalize_text
 from app.utils.money import paise_to_rupees
 from app.utils.time import utcnow
@@ -69,7 +69,7 @@ class PriceRecommendation:
 
 
 def round_paise(x: float) -> int:
-    return max(MIN_PRICE_PAISE, int(round(x / ROUND_TO_PAISE)) * ROUND_TO_PAISE)
+    return max(MIN_PRICE_PAISE, round(x / ROUND_TO_PAISE) * ROUND_TO_PAISE)
 
 
 def clamp_price(candidate_paise: int, reference_paise: int) -> int:
@@ -104,7 +104,7 @@ def compute_price(*, crop: str, grade: Grade | None, quantity_kg: Decimal, repor
         return max(0, (today - r.report_date).days)
 
     weights = [0.5 ** (age(r) / HALF_LIFE_DAYS) for r in pts]
-    reference = round(sum(w * r.average_paise for w, r in zip(weights, pts)) / sum(weights))
+    reference = round(sum(w * r.average_paise for w, r in zip(weights, pts, strict=True)) / sum(weights))
 
     last7 = [r.average_paise for r in pts if age(r) <= 7]
     prior = [r.average_paise for r in pts if 7 < age(r) <= 14]
@@ -137,7 +137,7 @@ def compute_price(*, crop: str, grade: Grade | None, quantity_kg: Decimal, repor
     ]
     explanation = (
         f"Reference market price is about Rs {paise_to_rupees(reference)}/kg for {crop}. "
-        f"Adjusted for grade ({'x%.2f' % gm}), lot size ({q_detail}) and the {trend} price trend, "
+        f"Adjusted for grade (x{gm:.2f}), lot size ({q_detail}) and the {trend} price trend, "
         f"the suggested price is Rs {paise_to_rupees(suggested)}/kg "
         f"(range Rs {paise_to_rupees(rmin)} to Rs {paise_to_rupees(rmax)}).")
     return PriceRecommendation(suggested, rmin, rmax, reference, trend, scope, len(pts), all_sample, source,

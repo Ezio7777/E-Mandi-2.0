@@ -23,6 +23,6 @@ async def emit_risk_event(session: AsyncSession, queue: JobQueue | None, event_t
     try:
         return await dispatch(session, queue, agent=AgentName.FRAUD_RISK, job_name=JOB, trigger_type=event_type, entity_type=entity_type,
                               entity_id=entity_id, job_args=(event_type, entity_type, str(entity_id)), idempotency_key=idempotency_key)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.warning("risk_event_emit_failed", event=event_type, error_type=type(exc).__name__)
         return None

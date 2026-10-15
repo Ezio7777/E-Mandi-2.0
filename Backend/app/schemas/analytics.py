@@ -1,46 +1,45 @@
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel
-
+from app.schemas.common import CamelModel
 from app.schemas.listing import Rupees
 
 Metric = Literal["signups", "listings", "orders", "gmv", "payments_failed", "disputes"]
 
 
-class UsersStat(BaseModel):
+class UsersStat(CamelModel):
     by_role: dict[str, int]
     new_in_window: int
     banned: int
 
 
-class ListingsStat(BaseModel):
+class ListingsStat(CamelModel):
     by_status: dict[str, int]
     new_in_window: int
     awaiting_grading_review: int
 
 
-class OrdersStat(BaseModel):
+class OrdersStat(CamelModel):
     by_status: dict[str, int]
     new_in_window: int
     gmv: Rupees                 # value of orders created in the window that reached PAID or later (excl. cancelled/refunded)
     average_order_value: Rupees | None
 
 
-class PaymentsStat(BaseModel):
+class PaymentsStat(CamelModel):
     succeeded: int
     failed: int
     success_rate: float | None
     refunded: Rupees            # refunds COMPLETED in the window
 
 
-class RiskStat(BaseModel):
+class RiskStat(CamelModel):
     disputes_open: int
     anomalies_open_by_severity: dict[str, int]
     pending_approvals: int
 
 
-class OverviewOut(BaseModel):
+class OverviewOut(CamelModel):
     window_days: int
     generated_at: datetime
     users: UsersStat
@@ -50,12 +49,12 @@ class OverviewOut(BaseModel):
     risk: RiskStat
 
 
-class SeriesPoint(BaseModel):
+class SeriesPoint(CamelModel):
     day: date
     value: float
 
 
-class TimeseriesOut(BaseModel):
+class TimeseriesOut(CamelModel):
     metric: Metric
     unit: Literal["count", "rupees"]
     days: int
@@ -63,13 +62,13 @@ class TimeseriesOut(BaseModel):
     total: float
 
 
-class TopCrop(BaseModel):
+class TopCrop(CamelModel):
     crop: str
     listings: int
     total_kg: float
     average_price: Rupees
 
 
-class TopCropsOut(BaseModel):
+class TopCropsOut(CamelModel):
     window_days: int
     items: list[TopCrop]

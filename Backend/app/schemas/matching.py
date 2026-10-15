@@ -3,14 +3,13 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
-
 from app.models.enums import Grade, MatchStatus
+from app.schemas.common import CamelModel
 from app.schemas.listing import Kg, Rupees
-from app.schemas.pricing import CamelModel, JobStatusOut
+from app.schemas.pricing import JobStatusOut
 
 
-class ReasonOut(BaseModel):
+class ReasonOut(CamelModel):
     factor: str
     matched: bool
     detail: str
@@ -31,7 +30,7 @@ class MatchOut(CamelModel):
     score: float  # 0-100
     reasons: list[ReasonOut]
     # additive
-    grade_score: float
+    grade_score: float  # 0-100
     quantity_score: float
     location_score: float
     price_score: float

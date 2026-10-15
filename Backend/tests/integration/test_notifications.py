@@ -3,12 +3,12 @@ import re
 import uuid
 from datetime import timedelta
 
-from sqlalchemy import select
-
 from app.core.config import get_settings
 from app.models.enums import NotificationType
 from app.models.notification import Notification
 from app.utils.time import utcnow
+from sqlalchemy import select
+
 from tests.integration.test_matching_agent import buyer, farmer
 from tests.integration.test_payments import setup
 

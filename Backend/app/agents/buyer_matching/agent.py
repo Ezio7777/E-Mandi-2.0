@@ -8,7 +8,6 @@ The agent controls the multi-step SEARCH WORKFLOW. Eligibility and scoring come 
 engine (services/matching.py); no LLM chooses or scores inventory. Each run records a step-by-step trace.
 """
 import uuid
-from decimal import Decimal
 from typing import Any, TypedDict
 
 from langgraph.graph import END, START, StateGraph
@@ -18,7 +17,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
 from app.core.database import transactional
-from app.models.buyer_requirement import BuyerRequirement
 from app.models.enums import ListingStatus as L
 from app.models.enums import MatchStatus, NotificationType, RequirementStatus
 from app.models.listing import Listing
@@ -27,7 +25,15 @@ from app.repositories.listing import grades_at_least
 from app.repositories.requirement import RequirementRepository
 from app.services.audit import SYSTEM_ACTOR, AuditService
 from app.services.matching import (
-    Candidate, Requirement, Scored, in_scope, is_eligible, locate, rank, score_candidate, total_available,
+    Candidate,
+    Requirement,
+    Scored,
+    in_scope,
+    is_eligible,
+    locate,
+    rank,
+    score_candidate,
+    total_available,
 )
 from app.services.notification import NotificationService
 from app.utils.crops import crop_or_title
@@ -64,7 +70,7 @@ class BuyerMatchingAgent:
         self.requirements = RequirementRepository(session)
         self.graph = self._build()
 
-    def _build(self):  # noqa: ANN202
+    def _build(self):
         g = StateGraph(MatchState)
         for n in ("validate_requirement", "filter_inventory", "search_step", "expand_scope", "rank", "persist"):
             g.add_node(n, getattr(self, n))
@@ -159,7 +165,7 @@ class BuyerMatchingAgent:
                         "reasons", "breakdown", "distance_km", "search_step", "rank", "execution_id")}))
             await self.session.execute(delete(Match).where(  # drop stale suggestions; never touch decided ones
                 Match.requirement_id == rid, Match.status == MatchStatus.SUGGESTED,
-                Match.listing_id.not_in([m.listing_id for m in sel]) if sel else True))
+                *([Match.listing_id.not_in([m.listing_id for m in sel])] if sel else [])))
             covered = total_available(sel)
             if sel:
                 r.status = RequirementStatus.MATCHED

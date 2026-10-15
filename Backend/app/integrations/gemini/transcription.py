@@ -20,7 +20,7 @@ class GeminiTranscriber:
         self.model = settings.GEMINI_TRANSCRIPTION_MODEL or settings.GEMINI_TEXT_MODEL
         self.timeout = settings.AI_PROVIDER_TIMEOUT_SECONDS
         key = settings.GEMINI_API_KEY.get_secret_value()
-        self.client = client or (genai.Client(api_key=key) if (key and self.model) else None)
+        self.client: Any = client or (genai.Client(api_key=key) if (key and self.model) else None)
 
     @property
     def available(self) -> bool:
@@ -33,9 +33,9 @@ class GeminiTranscriber:
             resp = await asyncio.wait_for(self.client.aio.models.generate_content(
                 model=self.model, contents=[types.Part.from_bytes(data=audio, mime_type=mime), PROMPT],
                 config=types.GenerateContentConfig(temperature=0)), self.timeout)
-        except (TimeoutError, asyncio.TimeoutError) as exc:
+        except TimeoutError as exc:
             raise SpeechProviderError("timeout", self.name) from exc
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning("gemini_transcription_failed", error_type=type(exc).__name__)
             raise SpeechProviderError("api_error", self.name) from exc
         text = getattr(resp, "text", None)

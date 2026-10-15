@@ -1,8 +1,6 @@
 import json
 import uuid
 
-from sqlalchemy import select
-
 from app.agents.fraud_risk.agent import FraudRiskAgent
 from app.core.config import get_settings
 from app.integrations.llm_common import LLMProviderError
@@ -11,8 +9,17 @@ from app.models.anomaly_event import AnomalyEvent
 from app.models.audit_log import AuditLog
 from app.models.crop_grading_result import CropGradingResult
 from app.models.enums import (
-    AgentName, AgentStatus, AnomalySeverity, AnomalyStatus, GradingProvider, Grade, ListingStatus, NotificationType, PendingActionStatus,
-    PendingActionType, DisputeStatus, OrderStatus,
+    AgentName,
+    AgentStatus,
+    AnomalySeverity,
+    AnomalyStatus,
+    DisputeStatus,
+    Grade,
+    GradingProvider,
+    ListingStatus,
+    OrderStatus,
+    PendingActionStatus,
+    PendingActionType,
 )
 from app.models.listing import Listing
 from app.models.listing_image import ListingImage
@@ -21,11 +28,14 @@ from app.models.pending_action import PendingAction
 from app.models.user import User
 from app.workers.queue import RecordingJobQueue
 from app.workers.risk_jobs import assess_risk_job
+from sqlalchemy import select
+
+from tests.conftest import wire
 from tests.integration.conftest import bearer
 from tests.integration.test_disputes import dispute, drow, paid
 from tests.integration.test_grading import make_admin
 from tests.integration.test_listings import create
-from tests.integration.test_matching_agent import buyer, farmer, mk
+from tests.integration.test_matching_agent import farmer, mk
 from tests.integration.test_payments import MP, deliver, start
 from tests.integration.test_pricing_agent import seed_market
 
@@ -138,7 +148,7 @@ async def test_flagged_run_marks_execution_review_required(app_ctx, client, db):
                          entity_type="listing", entity_id=lid, job_args=("listing.created", "listing", str(lid)))
     await assess_risk_job({"llms": []}, "listing.created", "listing", str(lid), str(eid))
     ex = await db.get(AgentExecution, eid, populate_existing=True)
-    assert ex.status == AgentStatus.REVIEW_REQUIRED and "1 signal(s) flagged for review (1 new, highest HIGH)" == ex.summary
+    assert ex.status == AgentStatus.REVIEW_REQUIRED and ex.summary == "1 signal(s) flagged for review (1 new, highest HIGH)"
     assert ex.provider == "deterministic" and ex.fallback_used is False
 
 
@@ -235,7 +245,7 @@ async def test_ai_summary_is_attached_only_when_valid_and_never_changes_classifi
     for bad in ('{"summary": "This farmer is committing fraud with prices."}', '{"summary": "Price is 77777 below normal, investigate it."}', "not json"):
         lid2 = await mk(db, fid, price=500, crop="Tomato", qty=801)
         await run(db, "listing.created", "listing", lid2, [LLM(bad)])
-        a2 = [x for x in await anomalies(db, entity_id=str(lid2))][0]
+        a2 = next(iter(await anomalies(db, entity_id=str(lid2))))
         assert "ai_summary" not in a2.details and a2.status == AnomalyStatus.FLAGGED_FOR_REVIEW
     lid3 = await mk(db, fid, price=500, qty=802)
     st = await run(db, "listing.created", "listing", lid3, [LLM(err="timeout")])
@@ -296,7 +306,7 @@ async def test_manual_assess_endpoint_queues_a_job(app_ctx, client, db):
     lid = await mk(db, fid)
     r = await client.post(f"{A}/risk/assess", json={"entity_type": "listing", "entity_id": str(lid)}, headers=a1)
     assert r.status_code == 202
-    ex = await db.get(AgentExecution, uuid.UUID(r.json()["data"]["jobId"]))
+    ex = await db.get(AgentExecution, uuid.UUID(wire(r)["data"]["jobId"]))
     assert ex.agent_name == AgentName.FRAUD_RISK and risk_jobs(app_ctx)[-1][1][:3] == ("listing.updated", "listing", str(lid))
     assert (await client.post(f"{A}/risk/assess", json={"entity_type": "user", "entity_id": str(lid)}, headers=a1)).status_code == 422
 

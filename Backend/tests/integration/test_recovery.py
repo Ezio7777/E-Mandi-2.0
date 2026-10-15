@@ -1,4 +1,5 @@
 """Stage 18: recovery sweepers + worker settings. Real Postgres/Redis; time is aged by editing timestamps."""
+import contextlib
 import json
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -242,7 +243,7 @@ async def test_orphan_sweeper_respects_delete_cap(app_ctx, client, db, redis):
     _, fid = await farmer(client, 1)
     lid = await mk(db, fid)
     st = FakeStorage()
-    for i in range(5):
+    for _i in range(5):
         k = f"e-mandi/listings/{lid}/{uuid.uuid4()}.jpg"
         st.put(k, b"x")
         st.modified[k] = OLD
@@ -261,10 +262,8 @@ async def test_orphan_sweeper_deletes_nothing_when_db_fails(app_ctx, db, redis):
             raise ConnectionError("db down")
     s = svc(redis, storage=st)
     s.sm = DeadSM()  # type: ignore[assignment]
-    try:
+    with contextlib.suppress(ConnectionError):
         await s.sweep_orphan_images()
-    except ConnectionError:
-        pass
     assert k in st.objects
 
 
@@ -374,3 +373,11 @@ def test_worker_settings_register_every_job_and_cron():
 async def test_read_worker_status_handles_missing(redis):
     s = await read_worker_status(redis, ["a"])
     assert s == {"heartbeat_age_seconds": None, "alive": False, "sweepers": {"a": None}}
+
+
+async def test_heartbeat_is_compatible_with_health_ready(app_ctx, client, redis):
+    """Regression: /health/ready parses the heartbeat as epoch seconds; an ISO string made readiness fail with 503."""
+    await worker_heartbeat_job({"settings": get_settings(), "redis_client": redis})
+    app_ctx.state.redis = redis
+    r = await client.get("/health/ready")
+    assert r.status_code == 200 and r.json()["checks"]["worker"] == "ok", r.text

@@ -1,10 +1,12 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from app.schemas.common import CamelModel
 
 
-class UploadInitRequest(BaseModel):
+class UploadInitRequest(CamelModel):
     listing_id: uuid.UUID
     filename: str = Field(min_length=1, max_length=255)  # informational only; never used to build keys
     content_type: str = Field(max_length=100)
@@ -12,13 +14,13 @@ class UploadInitRequest(BaseModel):
     replace_image_id: uuid.UUID | None = None
 
 
-class ProfileUploadInitRequest(BaseModel):
+class ProfileUploadInitRequest(CamelModel):
     filename: str = Field(min_length=1, max_length=255)
     content_type: str = Field(max_length=100)
     size_bytes: int = Field(gt=0)
 
 
-class UploadInitResponse(BaseModel):
+class UploadInitResponse(CamelModel):
     upload_token: str  # signed grant; must be echoed to /confirm
     url: str  # S3 presigned POST target
     fields: dict[str, str]  # send ALL of these as multipart form fields BEFORE the "file" field
@@ -27,11 +29,11 @@ class UploadInitResponse(BaseModel):
     max_bytes: int
 
 
-class UploadConfirmRequest(BaseModel):
+class UploadConfirmRequest(CamelModel):
     upload_token: str = Field(min_length=20, max_length=4096)
 
 
-class ImageOut(BaseModel):
+class ImageOut(CamelModel):
     id: uuid.UUID
     listing_id: uuid.UUID
     url: str
@@ -43,7 +45,7 @@ class ImageOut(BaseModel):
     created_at: datetime
 
 
-class AvatarOut(BaseModel):
+class AvatarOut(CamelModel):
     url: str
 
 

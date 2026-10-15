@@ -3,24 +3,33 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
-from arq import Retry
-from sqlalchemy import select
-
 from app.agents.buyer_matching.agent import BuyerMatchingAgent
 from app.core.config import get_settings
 from app.models.agent_execution import AgentExecution
 from app.models.audit_log import AuditLog
 from app.models.buyer_requirement import BuyerRequirement
 from app.models.enums import (
-    AgentStatus, AuthProvider, CropCategory, Grade, ListingStatus, MatchStatus, NotificationType, RequirementStatus, UserRole,
+    AgentStatus,
+    AuthProvider,
+    CropCategory,
+    Grade,
+    ListingStatus,
+    MatchStatus,
+    NotificationType,
+    RequirementStatus,
+    UserRole,
 )
 from app.models.listing import Listing
 from app.models.match import Match
-from app.models.user import User
 from app.models.notification import Notification
+from app.models.user import User
 from app.services.matching import Candidate, Requirement, score_candidate
 from app.utils.geo import resolve_point
 from app.workers.matching_jobs import match_requirement_job
+from arq import Retry
+from sqlalchemy import select
+
+from tests.conftest import wire
 from tests.integration.conftest import bearer, register
 from tests.integration.test_grading import make_admin
 
@@ -67,7 +76,7 @@ async def run_job(app_ctx, req, job_try=1):
 
 
 async def matches(client, h, req):
-    return (await client.get(f"{M}/requirements/{req['id']}", headers=h)).json()["data"]
+    return wire(await client.get(f"{M}/requirements/{req['id']}", headers=h))["data"]
 
 
 async def ex_of(db, req):
@@ -90,7 +99,7 @@ async def test_sufficient_quantity_immediately_contract_notifications_audit(app_
     assert m["listingId"] == str(lid) and m["score"] == 100.0 and m["rank"] == 1 and m["status"] == "SUGGESTED"
     assert [r["factor"] for r in m["reasons"]] == ["grade", "quantity", "location", "price", "availability"]
     assert all(set(r) == {"factor", "matched", "detail"} for r in m["reasons"])
-    assert m["listing"]["farmerName"] and m["listing"]["pricePerKg"] == 28.5 and m["gradeScore"] == 1.0
+    assert m["listing"]["farmerName"] and m["listing"]["pricePerKg"] == 28.5 and m["gradeScore"] == 100.0
     ex = await ex_of(db, req)
     assert ex.status == AgentStatus.COMPLETED and "fully cover" in ex.summary and "1 search step" in ex.summary and ex.provider == "deterministic"
     assert [c["tool"] for c in ex.tool_calls] == ["inventory_filter", "search_step"]
@@ -241,8 +250,8 @@ async def test_unknown_location_only_matches_at_widest_scope_with_weak_location_
     req = await post_req(client, bh, location="Xyzville")
     await run_job(app_ctx, req)
     ms = {m["listingId"]: m for m in (await matches(client, bh, req))["matches"]}
-    assert ms[str(same)]["locationScore"] == 1.0 and ms[str(other)]["locationScore"] == 0.1
-    assert "Distance unknown" in [r for r in ms[str(other)]["reasons"] if r["factor"] == "location"][0]["detail"]
+    assert ms[str(same)]["locationScore"] == 100.0 and ms[str(other)]["locationScore"] == 10.0
+    assert "Distance unknown" in next(r for r in ms[str(other)]["reasons"] if r["factor"] == "location")["detail"]
     ex = await ex_of(db, req)
     assert [s["new"] for s in ex.tool_calls if s["tool"] == "search_step"] == [1, 0, 0, 0, 1]  # only the last (anywhere) step finds it
 
@@ -288,7 +297,7 @@ async def test_rbac_and_ownership(app_ctx, client, db):
     assert (await client.post(f"{R}/{req['id']}/cancel", headers=b2h)).status_code == 404
     assert (await client.post(f"{R}/{req['id']}/rematch", headers=b2h)).status_code == 404
     assert (await client.get(R, headers=b2h)).json()["data"] == [] and len((await client.get(R, headers=b1h)).json()["data"]) == 1
-    job = (await client.get(f"{M}/jobs/{req['match_job_id']}", headers=b1h)).json()["data"]
+    job = wire(await client.get(f"{M}/jobs/{req['match_job_id']}", headers=b1h))["data"]
     assert job["agent"] == "BUYER_MATCHING" and job["status"] == "COMPLETED" and job["matchCount"] == 1 and job["requirementId"] == req["id"]
     assert (await client.get(f"/api/v1/pricing/jobs/{req['match_job_id']}", headers=b1h)).status_code == 404  # wrong agent
 

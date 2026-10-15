@@ -2,8 +2,9 @@ import re
 import uuid
 from typing import Literal
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import EmailStr, Field, field_validator
 
+from app.schemas.common import CamelModel
 from app.schemas.user import UserOut
 
 # Self-service signup may only ever create these roles. ADMIN is never user-selectable.
@@ -22,7 +23,7 @@ def normalize_phone(raw: str) -> str:
     return p
 
 
-class RegisterRequest(BaseModel):
+class RegisterRequest(CamelModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     full_name: str = Field(min_length=1, max_length=200)
@@ -42,12 +43,12 @@ class RegisterRequest(BaseModel):
         return normalize_phone(v) if v else v
 
 
-class LoginRequest(BaseModel):
+class LoginRequest(CamelModel):
     email: EmailStr
     password: str = Field(min_length=1, max_length=128)
 
 
-class OtpRequest(BaseModel):
+class OtpRequest(CamelModel):
     phone: str
 
     @field_validator("phone")
@@ -56,36 +57,36 @@ class OtpRequest(BaseModel):
         return normalize_phone(v)
 
 
-class OtpChallengeOut(BaseModel):
+class OtpChallengeOut(CamelModel):
     challenge_id: uuid.UUID
     expires_in: int
 
 
-class OtpVerifyRequest(BaseModel):
+class OtpVerifyRequest(CamelModel):
     challenge_id: uuid.UUID
     code: str = Field(min_length=4, max_length=10, pattern=r"^\d+$")
     role: SelfServiceRole = "BUYER"  # only used if this phone number creates a NEW account
     full_name: str | None = Field(None, max_length=200)
 
 
-class GoogleLoginRequest(BaseModel):
+class GoogleLoginRequest(CamelModel):
     credential: str = Field(min_length=20, max_length=4096)
     role: SelfServiceRole = "BUYER"  # only used when a NEW account is created
 
 
-class RefreshRequest(BaseModel):
+class RefreshRequest(CamelModel):
     refresh_token: str = Field(min_length=20, max_length=256)
 
 
-class TokenResponse(BaseModel):
+class TokenResponse(CamelModel):
     access_token: str
     refresh_token: str
-    token_type: Literal["bearer"] = "bearer"
+    token_type: Literal["bearer"] = "bearer"  # noqa: S105  (OAuth token type, not a secret)
     expires_in: int
     is_demo: bool = False
     user: UserOut
 
 
-class DemoAccountOut(BaseModel):
+class DemoAccountOut(CamelModel):
     kind: Literal["farmer", "buyer", "admin"]
     label: str

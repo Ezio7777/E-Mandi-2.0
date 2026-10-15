@@ -2,7 +2,6 @@ import json
 from decimal import Decimal
 
 import pytest
-
 from app.agents import voice_answers as A
 from app.agents.tools.readonly import ReportFact
 from app.agents.voice_intents import Intent, parse
@@ -96,7 +95,7 @@ def test_trend_is_computed_from_data_not_guessed():
 @pytest.mark.parametrize("lang,needle", [("en", "average ₹30.00/kg"), ("hi", "औसत भाव ₹30.00/किलो"), ("kn", "ಸರಾಸರಿ ₹30.00/ಕೆಜಿ")])
 def test_templates_state_the_data_in_each_language(lang, needle):
     t = A.market_price("Tomato", "bengaluru", [R("2026-10-09", 3000)], lang)
-    assert needle in t and "2026-10-09" in t and A.script_ok(t, lang if lang != "en" else "en") or lang == "en"
+    assert (needle in t and "2026-10-09" in t and A.script_ok(t, lang if lang != "en" else "en")) or lang == "en"
 
 
 def test_other_city_fallback_is_disclosed_and_sample_flagged():

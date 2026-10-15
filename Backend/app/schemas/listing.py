@@ -3,9 +3,10 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Annotated, Any
 
-from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, field_validator
+from pydantic import ConfigDict, Field, PlainSerializer, field_validator
 
 from app.models.enums import CropCategory, Grade, ListingStatus
+from app.schemas.common import CamelModel
 
 Rupees = Annotated[Decimal, PlainSerializer(lambda v: float(v), return_type=float, when_used="json")]
 Kg = Annotated[Decimal, PlainSerializer(lambda v: float(v), return_type=float, when_used="json")]
@@ -37,7 +38,7 @@ def _check_harvest(v: date | None) -> date | None:
     return v
 
 
-class ListingCreate(BaseModel):
+class ListingCreate(CamelModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     crop_name: str = Field(min_length=2, max_length=120)
     crop_category: CropCategory = CropCategory.OTHER
@@ -53,7 +54,7 @@ class ListingCreate(BaseModel):
     _h = field_validator("harvest_date")(_check_harvest)
 
 
-class ListingUpdate(BaseModel):
+class ListingUpdate(CamelModel):
     """PATCH semantics. ai_grade / status / suggested_price are NOT client-settable."""
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     crop_name: str | None = Field(None, min_length=2, max_length=120)
@@ -70,12 +71,12 @@ class ListingUpdate(BaseModel):
     _h = field_validator("harvest_date")(_check_harvest)
 
 
-class FarmerPublic(BaseModel):
+class FarmerPublic(CamelModel):
     id: uuid.UUID
     name: str
 
 
-class ListingOut(BaseModel):
+class ListingOut(CamelModel):
     id: uuid.UUID
     farmer: FarmerPublic
     crop_name: str
@@ -94,16 +95,17 @@ class ListingOut(BaseModel):
     harvest_date: date | None
     primary_image_url: str | None = None
     image_count: int = 0
+    verified_document_count: int = 0  # certificates an admin has verified
     created_at: datetime
     updated_at: datetime
 
 
-class ListingPage(BaseModel):
+class ListingPage(CamelModel):
     items: list[ListingOut]
     next_cursor: str | None
 
 
-class InventoryItemOut(BaseModel):
+class InventoryItemOut(CamelModel):
     listing_id: uuid.UUID
     crop_name: str
     status: ListingStatus
@@ -112,7 +114,7 @@ class InventoryItemOut(BaseModel):
     available_kg: Kg
 
 
-class InventoryAdjust(BaseModel):
+class InventoryAdjust(CamelModel):
     model_config = ConfigDict(extra="forbid")
     quantity_kg: Decimal  # NEW TOTAL quantity
     reason: str = Field(min_length=3, max_length=300)

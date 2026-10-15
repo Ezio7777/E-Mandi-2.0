@@ -9,7 +9,16 @@ from app.core.errors import NotFoundError
 from app.core.rate_limit import rate_limit
 from app.models.enums import AnomalySeverity, AnomalyStatus, PendingActionStatus, PendingActionType, UserRole
 from app.schemas.admin import (
-    ActionRequestIn, AnomalyActionIn, AnomalyOut, AnomalyPage, DecisionIn, NoteIn, PendingActionOut, PendingActionPage, RiskAssessIn,
+    ActionRequestIn,
+    AnomalyActionIn,
+    AnomalyOut,
+    AnomalyPage,
+    DecisionIn,
+    NoteIn,
+    PendingActionOut,
+    PendingActionPage,
+    RiskAssessIn,
+    WorkerStatusOut,
 )
 from app.schemas.common import Envelope
 from app.schemas.pricing import JobAccepted
@@ -148,7 +157,7 @@ from app.services.recovery import read_worker_status  # noqa: E402
 from app.workers.maintenance_jobs import SWEEPERS  # noqa: E402
 
 
-@router.get("/workers")
+@router.get("/workers", response_model=Envelope[WorkerStatusOut])
 async def worker_status(redis: RedisDep):
     """Worker liveness (heartbeat age) plus the last result of every recovery sweeper."""
     return Envelope(data=await read_worker_status(redis, list(SWEEPERS)))

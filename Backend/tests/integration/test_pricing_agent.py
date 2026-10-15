@@ -3,9 +3,6 @@ import uuid
 from datetime import date, timedelta
 
 import pytest
-from arq import Retry
-from sqlalchemy import select
-
 from app.agents.runtime import AgentExecutionService, AgentOutcome, dispatch
 from app.agents.smart_pricing.agent import SmartPricingAgent
 from app.agents.smart_pricing.explainer import PriceExplainer
@@ -20,8 +17,12 @@ from app.models.pricing_result import PricingResult
 from app.services.embedding import HashEmbeddingProvider
 from app.workers.pricing_jobs import price_listing_job
 from app.workers.queue import RecordingJobQueue
+from arq import Retry
+from sqlalchemy import select
+
+from tests.conftest import wire
 from tests.integration.conftest import bearer, register
-from tests.integration.test_grading import G, analyzing_listing, make_admin, raw, service
+from tests.integration.test_grading import G, analyzing_listing, make_admin, raw
 from tests.integration.test_listings import create, set_status
 
 TODAY = date.today()
@@ -164,7 +165,7 @@ async def test_comparable_listings_are_informational_only(app_ctx, client, db):
     llm = LLM(reply=GOOD)
     await agent(db, llm).run(lid)
     r = (await db.scalars(select(PricingResult))).one()
-    comp = [f for f in r.factors if f["name"] == "comparable_listings"][0]
+    comp = next(f for f in r.factors if f["name"] == "comparable_listings")
     assert "median Rs 31.00" in comp["detail"] and comp["informational"] is True
     assert r.suggested_paise == 3300  # comparables never move the price
     assert '"comparable_active_listings"' in llm.prompts[0]
@@ -313,32 +314,32 @@ async def test_contract_flow_post_grading_job_status_and_pricing(app_ctx, client
     l = await db.get(Listing, uuid.UUID(d["id"]))
     up = await client.post("/api/v1/uploads/init", headers=h, json={"listingId": d["id"], "filename": "a.jpg",
                                                                    "contentType": "image/jpeg", "sizeBytes": 1000})
-    init = up.json()["data"]
+    init = wire(up)["data"]
     assert up.status_code == 200 and {"uploadUrl", "fields", "objectKey", "uploadToken"} <= init.keys()
     assert init["objectKey"].startswith(f"e-mandi/listings/{d['id']}/") and init["fields"]["key"] == init["objectKey"]
     app_ctx.state.fake_storage.put(init["objectKey"], img_bytes())
     cf = await client.post("/api/v1/uploads/confirm", headers=h, json={"uploadToken": init["uploadToken"]})
-    assert cf.status_code == 200 and cf.json()["data"]["isPrimary"] is True and "contentType" in cf.json()["data"]
+    assert cf.status_code == 200 and wire(cf)["data"]["isPrimary"] is True and "contentType" in wire(cf)["data"]
     _ = (confirm, upload, l)
 
     r = await client.post("/api/v1/grading", headers=h, json={"listingId": d["id"]})
     assert r.status_code == 202
-    jid = r.json()["data"]["jobId"]
-    st = (await client.get(f"/api/v1/grading/jobs/{jid}", headers=h)).json()["data"]
+    jid = wire(r)["data"]["jobId"]
+    st = wire(await client.get(f"/api/v1/grading/jobs/{jid}", headers=h))["data"]
     assert st["status"] == "QUEUED" and st["agent"] == "CROP_GRADING" and st["result"] is None and st["listingId"] == d["id"]
 
     q = RecordingJobQueue()
     await run_grading_job(app_ctx, uuid.UUID(d["id"]), jid, [G("gemini", raw())], q)
-    st = (await client.get(f"/api/v1/grading/jobs/{jid}", headers=h)).json()["data"]
+    st = wire(await client.get(f"/api/v1/grading/jobs/{jid}", headers=h))["data"]
     res = st["result"]
     assert st["status"] == "COMPLETED" and st["pricing"] is None
     assert res["grade"] == "A" and res["defectPercent"] == 2.5 and res["explanation"] == "Minor bruising"
     assert res["manualReviewRecommended"] is False and res["provider"] == "gemini" and "gradedAt" in res and res["issues"] == ["Minor bruising"]
 
     await price_listing_job({"embedder": EMB, "explainer": PriceExplainer([LLM(reply=GOOD)])}, *q.jobs[0][1])
-    st = (await client.get(f"/api/v1/grading/jobs/{jid}", headers=h)).json()["data"]
+    st = wire(await client.get(f"/api/v1/grading/jobs/{jid}", headers=h))["data"]
     assert st["pricing"]["suggested"] == 33.0 and st["pricing"]["referencePrice"] == 30.0 and st["pricing"]["explanationProvider"] == "gemini"
-    p = (await client.get(f"/api/v1/pricing/listings/{d['id']}", headers=h)).json()["data"]
+    p = wire(await client.get(f"/api/v1/pricing/listings/{d['id']}", headers=h))["data"]
     assert {"suggested", "rangeMin", "rangeMax", "referencePrice", "trend", "explanation", "source"} <= p.keys()
 
 
@@ -352,11 +353,11 @@ async def test_job_and_pricing_visibility_and_refresh(app_ctx, client, db):
     assert (await client.get(f"{P}/listings/{lid}", headers=h1)).status_code == 404  # nothing priced yet
     r = await client.post(f"{P}/listings/{lid}/refresh", headers=h1)
     assert r.status_code == 202
-    jid = r.json()["data"]["jobId"]
+    jid = wire(r)["data"]["jobId"]
     (name, args), = app_ctx.state.fake_queue.jobs[-1:]
     assert name == "price_listing_job" and args == (str(lid), None, jid)
     await price_listing_job({"embedder": EMB, "explainer": PriceExplainer([]), "job_try": 1}, *args)
-    js = (await client.get(f"{P}/jobs/{jid}", headers=h1)).json()["data"]
+    js = wire(await client.get(f"{P}/jobs/{jid}", headers=h1))["data"]
     assert js["status"] == "COMPLETED" and js["provider"] == "deterministic" and js["agent"] == "SMART_PRICING"
     assert (await client.get(f"{P}/jobs/{jid}", headers=admin)).status_code == 200
     for who in (h2, buyer):

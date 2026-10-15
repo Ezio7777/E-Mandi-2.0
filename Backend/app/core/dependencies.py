@@ -31,7 +31,7 @@ from app.core.errors import ForbiddenError, UnauthorizedError  # noqa: E402
 from app.core.rate_limit import client_ip  # noqa: E402
 from app.core.security import AccessClaims, decode_access_token  # noqa: E402
 from app.integrations.google.oidc import GoogleIdentityVerifier, GoogleOIDCVerifier  # noqa: E402
-from app.integrations.sms import ConsoleOTPSender, OTPSender, UnconfiguredOTPSender  # noqa: E402
+from app.integrations.sms import OTPSender, build_otp_sender  # noqa: E402
 from app.models.enums import UserRole  # noqa: E402
 from app.models.user import User  # noqa: E402
 from app.repositories.session import SessionRepository  # noqa: E402
@@ -56,8 +56,12 @@ def get_google_verifier(request: Request, settings: SettingsDep) -> GoogleIdenti
     return verifier
 
 
-def get_otp_sender(settings: SettingsDep) -> OTPSender:
-    return UnconfiguredOTPSender() if settings.is_production else ConsoleOTPSender()
+def get_otp_sender(request: Request, settings: SettingsDep) -> OTPSender:
+    sender = getattr(request.app.state, "otp_sender", None)
+    if sender is None:
+        sender = build_otp_sender(settings)
+        request.app.state.otp_sender = sender  # one boto3 client per process
+    return sender
 
 
 async def get_claims(request: Request,

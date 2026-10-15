@@ -30,7 +30,7 @@ async def match_requirement_job(ctx: dict[str, Any], requirement_id: str, execut
             steps = len(st.get("trace", []))
             summary = {"matched": f"{len(sel)} match(es) fully cover the requirement after {steps} search step(s)",
                        "partial": f"{len(sel)} match(es) partially cover the requirement; search limit reached after {steps} step(s)",
-                       "no_match": f"no eligible inventory found after {steps} search step(s)"}[out]
+                       "no_match": f"no eligible inventory found after {steps} search step(s)"}[str(out)]
             return AgentOutcome(AgentStatus.COMPLETED, summary, "deterministic", False, calls)
 
         try:

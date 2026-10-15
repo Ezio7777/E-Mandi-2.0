@@ -4,14 +4,22 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 
 from app.core.dependencies import (
-    CurrentUser, RequestContextDep, SessionDep, SettingsDep, get_job_queue, get_embedding_provider, require_roles,
+    CurrentUser,
+    RequestContextDep,
+    SessionDep,
+    get_embedding_provider,
+    get_job_queue,
+    require_roles,
 )
 from app.core.errors import NotFoundError
 from app.core.rate_limit import rate_limit
 from app.models.enums import Grade, UserRole
 from app.schemas.common import Envelope
 from app.schemas.market import (
-    MarketReportOut, MarketReportsUpsert, MarketSearchOut, UpsertResult,
+    MarketReportOut,
+    MarketReportsUpsert,
+    MarketSearchOut,
+    UpsertResult,
 )
 from app.schemas.pricing import PricingOut
 from app.services.embedding import EmbeddingProvider
@@ -53,7 +61,7 @@ async def search(_: CurrentUser, session: SessionDep, embedder: Embedder, q: str
 @router.get("/price-recommendation", response_model=Envelope[PricingOut])
 async def price_recommendation(_: CurrentUser, session: SessionDep, crop: str = Query(min_length=2, max_length=120),
                                location: str | None = Query(None, max_length=200), grade: Grade | None = None,
-                               quantity_kg: Decimal = Query(Decimal(100), gt=0, le=Decimal(1000000))):
+                               quantity_kg: Decimal = Query(Decimal(100), gt=0, le=1_000_000)):
     """Deterministic recommendation for ad-hoc queries. Listing-bound recommendations (Smart Pricing Agent) come in Stage 10."""
     return Envelope(data=to_out(await PricingService(session).recommend(
         crop=crop, location=location, grade=grade, quantity_kg=quantity_kg)))
@@ -66,7 +74,7 @@ async def upsert_reports(body: MarketReportsUpsert, admin: CurrentUser, session:
     try:  # enqueue only after commit; ingestion must not fail if the queue is down (backfill endpoint exists)
         await queue.enqueue("embed_market_reports_job")
         queued = True
-    except Exception:  # noqa: BLE001
+    except Exception:
         queued = False
     return Envelope(data=UpsertResult(upserted=n, embedding_job_queued=queued))
 

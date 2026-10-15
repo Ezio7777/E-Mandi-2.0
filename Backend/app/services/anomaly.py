@@ -58,6 +58,6 @@ class AnomalyService:
         return await self._review(admin, anomaly_id, AnomalyStatus.RESOLVED, note, "anomaly.resolved", ctx)
 
     async def request_action(self, admin: User, anomaly_id: uuid.UUID, action_type: PendingActionType, payload: dict[str, Any],
-                             ctx: RequestContext):  # noqa: ANN201
+                             ctx: RequestContext):
         await self.get(anomaly_id)
         return await ApprovalService(self.session, self.settings).request(admin, action_type, payload, ctx, anomaly_id=anomaly_id)

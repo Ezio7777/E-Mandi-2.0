@@ -67,7 +67,7 @@ class MarketService:
             return 0
         vecs = await self.embedder.embed_documents([report_text(r) for r in pending])
         async with transactional(self.session):
-            for r, v in zip(pending, vecs):
+            for r, v in zip(pending, vecs, strict=True):
                 r.embedding, r.embedding_model = v, self.embedder.model_id
         return len(pending)
 

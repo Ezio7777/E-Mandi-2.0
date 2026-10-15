@@ -48,7 +48,7 @@ class S3Storage:
                 kw["aws_access_key_id"] = settings.AWS_ACCESS_KEY_ID
                 kw["aws_secret_access_key"] = settings.AWS_SECRET_ACCESS_KEY.get_secret_value()
             client = boto3.client("s3", **kw)
-        self.client = client
+        self.client: Any = client
 
     async def _run(self, fn, *a, **kw):
         try:

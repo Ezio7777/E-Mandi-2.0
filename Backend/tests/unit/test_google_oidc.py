@@ -2,10 +2,9 @@ import time
 
 import jwt
 import pytest
-from cryptography.hazmat.primitives.asymmetric import rsa
-
 from app.core.errors import UnauthorizedError
 from app.integrations.google.oidc import GoogleOIDCVerifier
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 CLIENT = "cid.apps.googleusercontent.com"
 

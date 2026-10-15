@@ -1,12 +1,18 @@
 import uuid
 from datetime import date
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
-from sqlalchemy import BigInteger, CheckConstraint, Date, Float, ForeignKey, Index, Numeric, String, Text
+from sqlalchemy import BigInteger, CheckConstraint, Date, Float, ForeignKey, Index, Numeric, String, Text, and_
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, pg_enum, uuid_pk
-from app.models.enums import CropCategory, Grade, ListingStatus
+from app.models.enums import CropCategory, DocumentStatus, Grade, ListingStatus
+from app.models.listing_document import ListingDocument
+
+if TYPE_CHECKING:
+    from app.models.listing_image import ListingImage
+    from app.models.user import User
 
 
 class Listing(Base, TimestampMixin):
@@ -37,11 +43,14 @@ class Listing(Base, TimestampMixin):
     longitude: Mapped[float | None] = mapped_column(Numeric(9, 6))
     harvest_date: Mapped[date | None] = mapped_column(Date)
 
-    farmer: Mapped["User"] = relationship(lazy="joined", viewonly=True)  # noqa: F821
+    farmer: Mapped["User"] = relationship(lazy="joined", viewonly=True)
 
-    images: Mapped[list["ListingImage"]] = relationship(  # noqa: F821
+    images: Mapped[list["ListingImage"]] = relationship(
         back_populates="listing", lazy="selectin", order_by="ListingImage.created_at",
         cascade="all, delete-orphan")
+    verified_documents: Mapped[list["ListingDocument"]] = relationship(
+        "ListingDocument", viewonly=True, lazy="selectin",
+        primaryjoin=lambda: and_(Listing.id == ListingDocument.listing_id, ListingDocument.status == DocumentStatus.VERIFIED))
 
     @property
     def available_kg(self) -> Decimal:

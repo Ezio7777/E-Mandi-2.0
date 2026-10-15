@@ -3,8 +3,6 @@ import json
 import uuid
 from datetime import timedelta
 
-from sqlalchemy import select
-
 from app.core.dependencies import get_voice_providers
 from app.integrations.llm_common import LLMProviderError
 from app.integrations.stt import SpeechProviderError, SpokenAudio, Transcript
@@ -14,8 +12,10 @@ from app.models.listing import Listing
 from app.models.market_report import MarketReport
 from app.services.voice import VoiceProviders
 from app.utils.time import utcnow
-from tests.integration.test_listings import create
+from sqlalchemy import select
+
 from tests.integration.conftest import bearer, register
+from tests.integration.test_listings import create
 from tests.integration.test_matching_agent import buyer, farmer, mk
 from tests.integration.test_pricing_agent import mr
 

@@ -55,7 +55,7 @@ from app.schemas.pricing import JobAccepted  # noqa: E402
 from app.services.agent_jobs import get_job_for_user, job_out  # noqa: E402
 
 
-def contract_result(r) -> GradingContractOut:  # noqa: ANN001
+def contract_result(r) -> GradingContractOut:
     return GradingContractOut(grade=r.grade, confidence=r.confidence, defect_percent=r.defect_percentage,
                               explanation=r.reason, issues=list(r.issues), provider=r.provider.value, graded_at=r.created_at,
                               manual_review_recommended=r.requires_review, fallback_used=r.fallback_used, from_cache=r.from_cache)

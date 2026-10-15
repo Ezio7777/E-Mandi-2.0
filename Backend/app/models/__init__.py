@@ -9,6 +9,7 @@ from app.models.dispute import Dispute
 from app.models.grading_review import GradingReview
 from app.models.idempotency_key import IdempotencyKey
 from app.models.listing import Listing
+from app.models.listing_document import ListingDocument
 from app.models.listing_image import ListingImage
 from app.models.market_report import MarketReport
 from app.models.match import Match

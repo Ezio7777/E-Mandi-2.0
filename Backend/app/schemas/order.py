@@ -2,13 +2,14 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import ConfigDict, Field, field_validator, model_validator
 
 from app.models.enums import Grade, OrderStatus
+from app.schemas.common import CamelModel
 from app.schemas.listing import Kg, Rupees, _check_qty
 
 
-class OrderItemIn(BaseModel):
+class OrderItemIn(CamelModel):
     """Deliberately has NO price/amount fields: the backend computes every amount from the listing's price."""
     model_config = ConfigDict(extra="forbid")
     listing_id: uuid.UUID
@@ -17,7 +18,7 @@ class OrderItemIn(BaseModel):
     _q = field_validator("quantity_kg")(_check_qty)
 
 
-class OrderCreate(BaseModel):
+class OrderCreate(CamelModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     items: list[OrderItemIn] = Field(min_length=1, max_length=10)
     delivery_address: str | None = Field(None, max_length=500)
@@ -32,17 +33,17 @@ class OrderCreate(BaseModel):
         return self
 
 
-class CancelRequest(BaseModel):
+class CancelRequest(CamelModel):
     model_config = ConfigDict(extra="forbid")
     reason: str | None = Field(None, min_length=3, max_length=500)
 
 
-class PartyOut(BaseModel):
+class PartyOut(CamelModel):
     id: uuid.UUID
     name: str
 
 
-class OrderItemOut(BaseModel):
+class OrderItemOut(CamelModel):
     listing_id: uuid.UUID
     crop_name: str
     quantity_kg: Kg
@@ -51,7 +52,7 @@ class OrderItemOut(BaseModel):
     grade: Grade | None
 
 
-class OrderOut(BaseModel):
+class OrderOut(CamelModel):
     id: uuid.UUID
     status: OrderStatus
     buyer: PartyOut
@@ -69,6 +70,6 @@ class OrderOut(BaseModel):
     updated_at: datetime
 
 
-class OrderPage(BaseModel):
+class OrderPage(CamelModel):
     items: list[OrderOut]
     next_cursor: str | None

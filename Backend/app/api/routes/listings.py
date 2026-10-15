@@ -6,17 +6,22 @@ from fastapi import APIRouter, Depends, Query
 
 from app.agents.fraud_risk.events import emit_risk_event
 from app.core.dependencies import (
-    CurrentUser, RequestContextDep, SessionDep, get_job_queue, get_url_resolver, require_roles,
+    CurrentUser,
+    RequestContextDep,
+    SessionDep,
+    get_job_queue,
+    get_url_resolver,
+    require_roles,
 )
 from app.core.errors import DomainValidationError
 from app.integrations.aws.image_url_resolver import ImageUrlResolver
 from app.models.enums import CropCategory, Grade, ListingStatus, UserRole
 from app.repositories.listing import ListingFilters
 from app.schemas.common import Envelope
-from app.workers.queue import JobQueue
 from app.schemas.listing import ListingCreate, ListingOut, ListingPage, ListingUpdate
 from app.services.listing import ListingService
 from app.utils.money import rupees_to_paise
+from app.workers.queue import JobQueue
 
 router = APIRouter(prefix="/listings", tags=["listings"])
 Farmer = Depends(require_roles(UserRole.FARMER))

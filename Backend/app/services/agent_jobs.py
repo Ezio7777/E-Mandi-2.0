@@ -6,8 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import NotFoundError
 from app.models.agent_execution import AgentExecution
-from app.models.enums import AgentName, UserRole
 from app.models.buyer_requirement import BuyerRequirement
+from app.models.enums import AgentName, UserRole
 from app.models.listing import Listing
 from app.models.user import User
 from app.schemas.pricing import JobStatusOut

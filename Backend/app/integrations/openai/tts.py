@@ -17,7 +17,7 @@ class OpenAISpeech:
     def __init__(self, settings: Settings, client: Any | None = None) -> None:
         self.model, self.voice, self.timeout = settings.OPENAI_TTS_MODEL, settings.OPENAI_TTS_VOICE, settings.AI_PROVIDER_TIMEOUT_SECONDS
         key = settings.OPENAI_API_KEY.get_secret_value()
-        self.client = client or (AsyncOpenAI(api_key=key, timeout=self.timeout) if (key and self.model and self.voice) else None)
+        self.client: Any = client or (AsyncOpenAI(api_key=key, timeout=self.timeout) if (key and self.model and self.voice) else None)
 
     @property
     def available(self) -> bool:
@@ -30,9 +30,9 @@ class OpenAISpeech:
             resp = await asyncio.wait_for(self.client.audio.speech.create(
                 model=self.model, voice=self.voice, input=text, response_format="mp3"), self.timeout)
             data = resp.content if hasattr(resp, "content") else await resp.aread()
-        except (TimeoutError, asyncio.TimeoutError) as exc:
+        except TimeoutError as exc:
             raise SpeechProviderError("timeout", self.name) from exc
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning("openai_tts_failed", error_type=type(exc).__name__)
             raise SpeechProviderError("api_error", self.name) from exc
         if not data:

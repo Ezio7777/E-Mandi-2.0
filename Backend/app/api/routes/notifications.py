@@ -53,7 +53,7 @@ async def read_all(user: CurrentUser, svc: Svc):
 
 
 def _event(n: Notification) -> str:
-    payload = NotificationOut.model_validate(n).model_dump(mode="json")
+    payload = NotificationOut.model_validate(n).model_dump(mode="json", by_alias=True)
     return f"id: {n.id}\nevent: notification\ndata: {json.dumps(payload)}\n\n"
 
 
@@ -65,7 +65,7 @@ async def _acquire_slot(redis: Redis, user_id: uuid.UUID, settings: Settings) ->
         if n > settings.SSE_MAX_CONNECTIONS_PER_USER:
             await redis.decr(key)
             return False
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.warning("sse_cap_unavailable", error=str(exc))  # fail open: availability over the cap
     return True
 
@@ -109,8 +109,8 @@ async def stream(request: Request, user: CurrentUser, settings: SettingsDep, red
         finally:
             try:
                 await redis.decr(f"sse:{uid}")
-            except Exception:  # noqa: BLE001
-                pass
+            except Exception as exc:
+                log.warning("sse_counter_release_failed", error_type=type(exc).__name__)  # the counter has a TTL, so it self-heals
 
     return StreamingResponse(gen(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"})

@@ -4,10 +4,18 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
-
 from app.models.enums import Grade
 from app.services.matching import (
-    WEIGHTS, Candidate, Requirement, in_scope, is_eligible, locate, price_score, rank, score_candidate, total_available,
+    WEIGHTS,
+    Candidate,
+    Requirement,
+    in_scope,
+    is_eligible,
+    locate,
+    price_score,
+    rank,
+    score_candidate,
+    total_available,
 )
 from app.utils.geo import canonical_city, haversine_km, resolve_point
 

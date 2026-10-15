@@ -2,7 +2,6 @@ import json
 from decimal import Decimal
 
 import pytest
-
 from app.agents.smart_pricing.explainer import PriceExplainer, allowed_numbers, validate_explanation
 from app.integrations.llm_common import LLMProviderError
 from app.services.pricing import PriceFactor, PriceRecommendation

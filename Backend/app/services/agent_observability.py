@@ -53,7 +53,7 @@ class AgentObservabilityService:
             out.append(AgentSummaryOut(
                 agent=a, display_name=DISPLAY[a], window_days=days, total_executions=total, total_executions_all_time=totals.get(a, 0),
                 success_count=ok, failed_count=failed, review_required_count=review, in_flight_count=int(s.get("inflight") or 0),
-                stuck_count=stuck, success_rate=_rate(ok, finished), avg_duration_ms=int(round(avg)) if avg is not None else None,
+                stuck_count=stuck, success_rate=_rate(ok, finished), avg_duration_ms=round(avg) if avg is not None else None,
                 fallback_count=fallback, fallback_rate=_rate(fallback, total), providers=providers.get(a, {}), triggers=triggers.get(a, {}),
                 last_execution=LastExecution(id=last.id, status=last.status, trigger_type=last.trigger_type, summary=last.summary,
                                              at=last.completed_at or last.started_at or last.created_at) if last else None,

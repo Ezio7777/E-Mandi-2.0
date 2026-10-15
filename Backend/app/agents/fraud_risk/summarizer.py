@@ -1,5 +1,6 @@
 """Optional AI assist: a short neutral summary of the deterministic signals for the admin. It can NOT change severity,
 status, or create/clear flags. Output is validated (no new numbers, no accusatory words, no links) or discarded."""
+import contextlib
 import json
 import re
 from dataclasses import dataclass
@@ -21,10 +22,8 @@ BANNED = ("fraud", "scam", "criminal", "cheat", "thief", "steal", "guilty", "ill
 def _nums(text: str) -> set[Decimal]:
     out: set[Decimal] = set()
     for t in _NUM.findall(text):
-        try:
+        with contextlib.suppress(InvalidOperation):
             out.add(Decimal(t.replace(",", "")))
-        except InvalidOperation:
-            pass
     return out
 
 

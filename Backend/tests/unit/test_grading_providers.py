@@ -3,14 +3,13 @@ import json
 from types import SimpleNamespace
 
 import pytest
-
 from app.core.config import Settings
 from app.integrations.gemini.vision import GeminiVisionGrader
 from app.integrations.openai.vision import OpenAIVisionGrader
 from app.integrations.vision_common import GradingProviderError, crop_label
 from app.models.enums import Grade
-from app.services.grading import GradingService, GradingUnavailable, consistency_flags, expected_grade
 from app.schemas.grading import GradingOutput, RawGrading
+from app.services.grading import GradingService, GradingUnavailable, consistency_flags, expected_grade
 
 S = Settings(ENVIRONMENT="test", JWT_SECRET="unit-test-secret-unit-test-secret-000000", AI_PROVIDER_TIMEOUT_SECONDS=0.1,
              GEMINI_API_KEY="k", GEMINI_VISION_MODEL="m", OPENAI_API_KEY="k", OPENAI_VISION_MODEL="m")

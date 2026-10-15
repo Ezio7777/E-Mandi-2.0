@@ -1,9 +1,8 @@
 from io import BytesIO
 
 import pytest
-from PIL import Image
-
 from app.utils.images import InvalidImage, sniff_image
+from PIL import Image
 
 
 def _img(fmt, size=(300, 300)):

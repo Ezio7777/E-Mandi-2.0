@@ -2,12 +2,13 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import ConfigDict, Field, field_validator
 
 from app.models.enums import Grade, GradingProvider, ReviewDecision
+from app.schemas.common import CamelModel
 
 
-class RawGrading(BaseModel):
+class RawGrading(CamelModel):
     """Strict contract for what a vision model may return. Anything else is rejected (never trusted)."""
     model_config = ConfigDict(extra="forbid")
     grade: Grade
@@ -36,7 +37,7 @@ class GradingOutput(RawGrading):
     fallback_used: bool = False
 
 
-class GradingResultOut(BaseModel):
+class GradingResultOut(CamelModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     listing_id: uuid.UUID
@@ -52,7 +53,7 @@ class GradingResultOut(BaseModel):
     created_at: datetime
 
 
-class ReviewRequest(BaseModel):
+class ReviewRequest(CamelModel):
     model_config = ConfigDict(extra="forbid")
     decision: ReviewDecision
     final_grade: Grade | None = None
@@ -64,7 +65,7 @@ class ReviewRequest(BaseModel):
         return v
 
 
-class ReviewQueueItem(BaseModel):
+class ReviewQueueItem(CamelModel):
     listing_id: uuid.UUID
     crop_name: str
     farmer_id: uuid.UUID

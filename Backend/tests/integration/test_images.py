@@ -2,16 +2,16 @@ import uuid
 from io import BytesIO
 
 import jwt
-from pydantic import SecretStr
-from PIL import Image
-from sqlalchemy import select
-
 from app.core.config import get_settings
 from app.core.security import sign_token
 from app.models.audit_log import AuditLog
 from app.models.enums import CropCategory, ListingStatus
 from app.models.listing import Listing
 from app.models.listing_image import ListingImage
+from PIL import Image
+from pydantic import SecretStr
+from sqlalchemy import select
+
 from tests.integration.conftest import bearer, register
 
 I = "/api/v1/images"

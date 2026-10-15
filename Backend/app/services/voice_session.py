@@ -44,18 +44,18 @@ class VoiceSessionStore:
             if raw:
                 d = json.loads(raw)
                 return SessionState(sid, list(d.get("turns", [])), d.get("crop"), d.get("city"))
-        except Exception as exc:  # noqa: BLE001 - the assistant still works statelessly if Redis hiccups
+        except Exception as exc:
             log.warning("voice_session_load_failed", error_type=type(exc).__name__)
         return SessionState(sid)
 
     async def save(self, user_id: uuid.UUID, st: SessionState, user_text: str, answer: str) -> None:
         if self.redis is None:
             return
-        st.turns = (st.turns + [{"role": "user", "text": user_text}, {"role": "assistant", "text": answer}])[-2 * self.max_turns:]
+        st.turns = ([*st.turns, {"role": "user", "text": user_text}, {"role": "assistant", "text": answer}])[-2 * self.max_turns:]
         try:
             await self.redis.set(self._key(user_id, st.session_id),
                                  json.dumps({"turns": st.turns, "crop": st.crop, "city": st.city}, ensure_ascii=False), ex=self.ttl)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning("voice_session_save_failed", error_type=type(exc).__name__)
 
     async def get(self, user_id: uuid.UUID, session_id: str) -> SessionState | None:

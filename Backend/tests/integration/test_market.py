@@ -1,13 +1,13 @@
 from datetime import date, timedelta
 
-import pytest
-from sqlalchemy import select, text
-
 from app.core.dependencies import get_embedding_provider
 from app.models.audit_log import AuditLog
 from app.models.market_report import MarketReport
 from app.services.embedding import EmbeddingProviderError, HashEmbeddingProvider
 from app.workers.embedding_jobs import embed_market_reports_job
+from sqlalchemy import select, text
+
+from tests.conftest import wire
 from tests.integration.conftest import bearer, register
 from tests.integration.test_grading import make_admin
 
@@ -129,13 +129,13 @@ async def test_price_recommendation_endpoint_contract(client, db):
     await seed(client, admin, [rep(days_ago=d, avg=30 + d * 0.0) for d in (0, 1, 2, 3)])
     h = bearer(await register(client))
     r = await client.get(f"{M}/price-recommendation?crop=tamatar&location=Bengaluru&grade=A&quantity_kg=200", headers=h)
-    d = r.json()["data"]
+    d = wire(r)["data"]
     assert r.status_code == 200
     assert {"suggested", "rangeMin", "rangeMax", "referencePrice", "trend", "explanation", "source"} <= d.keys()
     assert d["rangeMin"] <= d["suggested"] <= d["rangeMax"] and d["referencePrice"] == 30.0
     assert d["suggested"] == 33.0 and d["isSample"] is True and d["scope"] == "local" and "Sample" in d["source"]
     assert d["factors"][1]["name"] == "grade" and "effectPct" in d["factors"][1]
-    b = (await client.get(f"{M}/price-recommendation?crop=tomato&grade=D", headers=h)).json()["data"]
+    b = wire(await client.get(f"{M}/price-recommendation?crop=tomato&grade=D", headers=h))["data"]
     assert b["scope"] == "national_fallback" and b["suggested"] < 30  # no location => national scope, grade D discount
     assert (await client.get(f"{M}/price-recommendation?crop=dragonfruit", headers=h)).status_code == 404
     assert (await client.get(f"{M}/price-recommendation?crop=tomato&quantity_kg=0", headers=h)).status_code == 422

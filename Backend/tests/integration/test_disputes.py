@@ -1,25 +1,25 @@
 import asyncio
 import uuid
 
-from sqlalchemy import select, text
-
 from app.core.config import get_settings
 from app.core.database import get_sessionmaker
 from app.core.errors import ConflictError
 from app.models.audit_log import AuditLog
 from app.models.dispute import Dispute
-from app.models.enums import DisputeStatus, NotificationType, OrderStatus, PaymentStatus
+from app.models.enums import NotificationType, OrderStatus, PaymentStatus
 from app.models.notification import Notification
 from app.models.refund import Refund
 from app.models.user import User
 from app.schemas.dispute import DisputeCreate
 from app.services.audit import RequestContext
 from app.services.dispute import DisputeService
+from sqlalchemy import select, text
+
 from tests.integration.conftest import bearer
 from tests.integration.test_grading import make_admin
 from tests.integration.test_matching_agent import buyer, farmer
 from tests.integration.test_orders import order_row
-from tests.integration.test_payments import MP, P, captured, deliver, pay_row, setup, start
+from tests.integration.test_payments import MP, captured, deliver, pay_row, setup, start
 
 D = "/api/v1/disputes"
 O = "/api/v1/orders"
@@ -73,7 +73,7 @@ async def test_who_and_when_a_dispute_can_be_raised(app_ctx, client, db):
     admin = await make_admin(db, client)
     c = await setup(client, db)  # order is only RESERVED
     assert (await dispute(client, c)).status_code == 409
-    await client.post(f"/api/v1/payments", json={"order_id": c["oid"]}, headers={**c["bh"], "Idempotency-Key": "pay-key-0001"})
+    await client.post("/api/v1/payments", json={"order_id": c["oid"]}, headers={**c["bh"], "Idempotency-Key": "pay-key-0001"})
     assert (await dispute(client, c)).status_code == 409  # PAYMENT_PENDING is not disputable either
     other_b, _ = await buyer(client, 2)
     other_f, _ = await farmer(client, 2)
@@ -294,3 +294,17 @@ async def test_concurrent_dispute_creation_yields_exactly_one(app_ctx, client, d
     res = await asyncio.gather(_raise(c["b1"], uuid.UUID(c["oid"])), _raise(c["f1"], uuid.UUID(c["oid"])),
                                _raise(c["b1"], uuid.UUID(c["oid"])), _raise(c["f1"], uuid.UUID(c["oid"])))
     assert sorted(res) == ["conflict", "conflict", "conflict", "ok"] and len((await db.scalars(select(Dispute))).all()) == 1
+
+
+async def test_dispute_driven_full_refund_restocks_inventory(app_ctx, client, db):
+    from tests.integration.test_payments import listing_row
+    admin = await make_admin(db, client)
+    c = await paid(client, app_ctx, db)
+    assert (await listing_row(db, c["lid"])).quantity_kg == 300
+    d = (await dispute(client, c)).json()["data"]
+    u = f"{D}/{d['id']}"
+    await client.post(f"{u}/resolve", json={"outcome": "BUYER_REFUND", "resolution": "Quality complaint upheld by evidence."}, headers=admin)
+    assert (await client.post(f"{u}/refund", json={}, headers=admin)).status_code == 201
+    await db.rollback()
+    assert (await listing_row(db, c["lid"])).quantity_kg == 800
+    assert (await order_row(db, c["oid"])).restocked_at is not None

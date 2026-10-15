@@ -75,7 +75,7 @@ class VoiceAssistantAgent:
         self.graph = self._build()
 
     # ------------------------------------------------------------------ graph
-    def _build(self):  # noqa: ANN202
+    def _build(self):
         g = StateGraph(VoiceState)
         for n in ("understand", "classify_llm", "authorize", "gather", "compose", "polish"):
             g.add_node(n, getattr(self, n))
@@ -162,22 +162,22 @@ class VoiceAssistantAgent:
                 return {"outcome": "answered", "answer": A.price_advice(adv, qty, lang),
                         "sources": [{"type": "pricing", "title": "Deterministic price suggestion", "detail": adv.source, "date": None, "is_sample": adv.is_sample}]}
             if p.intent == Intent.LISTING_SEARCH:
-                rows = await self.tools.listing_search(crop, city)
-                if not rows:
+                found = await self.tools.listing_search(crop, city)
+                if not found:
                     return {"outcome": "no_data", "answer": A.no_listings(crop, city, lang)}
-                return {"outcome": "answered", "answer": A.listing_summary(crop, city, rows, lang),
-                        "sources": [_src_listing("listing", r) for r in rows[:3]]}
+                return {"outcome": "answered", "answer": A.listing_summary(crop, city, found, lang),
+                        "sources": [_src_listing("listing", r) for r in found[:3]]}
             if p.intent == Intent.MY_INVENTORY:
-                rows = await self.tools.farmer_inventory_lookup()
-                if not rows:
+                stock = await self.tools.farmer_inventory_lookup()
+                if not stock:
                     return {"outcome": "no_data", "answer": A.fixed("NO_INVENTORY", lang)}
-                return {"outcome": "answered", "answer": A.inventory_summary(rows, lang),
-                        "sources": [_src_listing("inventory", r) for r in rows[:3]]}
+                return {"outcome": "answered", "answer": A.inventory_summary(stock, lang),
+                        "sources": [_src_listing("inventory", r) for r in stock[:3]]}
         except ForbiddenError:
             return {"outcome": "refused", "answer": A.fixed("FARMERS_ONLY", lang)}
         except ToolNotAllowed:
             return {"outcome": "refused", "answer": A.fixed("ACTION_NOT_ALLOWED", lang)}
-        except Exception as exc:  # noqa: BLE001 - timeouts / DB hiccups: answer honestly, never guess
+        except Exception as exc:
             log.warning("voice_tool_failed", intent=p.intent.value, error_type=type(exc).__name__)
             return {"outcome": "no_data", "answer": A.fixed("TOOL_ERROR", lang), "degraded": [*s["degraded"], "tool_error"]}
         return {"outcome": "unknown", "answer": A.fixed("UNKNOWN", lang)}

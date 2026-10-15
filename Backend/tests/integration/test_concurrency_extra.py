@@ -3,12 +3,10 @@ import asyncio
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import func, select, update
-
 from app.core.config import get_settings
 from app.core.database import get_sessionmaker
 from app.models.agent_execution import AgentExecution
-from app.models.enums import AgentName, AgentStatus, OrderStatus, PaymentStatus, PendingActionStatus
+from app.models.enums import AgentName, OrderStatus, PaymentStatus, PendingActionStatus
 from app.models.order import Order
 from app.models.payment import Payment
 from app.models.payment_event import PaymentEvent
@@ -16,10 +14,12 @@ from app.models.pending_action import PendingAction
 from app.models.user import User
 from app.services.payment import PaymentService
 from app.workers.queue import RecordingJobQueue
+from sqlalchemy import func, select, update
+
 from tests.integration.test_matching_agent import farmer, mk
 from tests.integration.test_payments import captured, start
 from tests.integration.test_recovery import mk_exec, svc
-from tests.integration.test_risk import two_admins, req
+from tests.integration.test_risk import req, two_admins
 
 A = "/api/v1/admin"
 REASON = "Reviewed and agreed by a second admin."

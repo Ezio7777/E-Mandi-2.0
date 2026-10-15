@@ -30,7 +30,13 @@ from app.services.embedding import EmbeddingProvider
 from app.services.market import MarketService
 from app.services.notification import NotificationService
 from app.services.pricing import (
-    WINDOW_DAYS, NoMarketDataError, PriceRecommendation, ReportPoint, compute_price, to_point, within_bounds,
+    WINDOW_DAYS,
+    NoMarketDataError,
+    PriceRecommendation,
+    ReportPoint,
+    compute_price,
+    to_point,
+    within_bounds,
 )
 from app.utils.crops import crop_or_title
 from app.utils.money import paise_to_rupees
@@ -72,7 +78,7 @@ class SmartPricingAgent:
         self.listings, self.market = ListingRepository(session), MarketRepository(session)
         self.graph = self._build()
 
-    def _build(self):  # noqa: ANN202
+    def _build(self):
         g = StateGraph(PricingState)
         for name in ("load_context", "retrieve_market", "comparable_listings", "compute", "explain", "validate", "persist"):
             g.add_node(name, getattr(self, name))
@@ -128,7 +134,7 @@ class SmartPricingAgent:
     async def explain(self, s: PricingState) -> dict[str, Any]:
         rec, comp = s["rec"], s["comparable"]
         r = lambda p: f"{paise_to_rupees(p)}"  # noqa: E731
-        facts = {"crop": s["crop"], "location": s["location"], "grade": s["grade"].value if s["grade"] else "unknown",
+        facts: dict[str, Any] = {"crop": s["crop"], "location": s["location"], "grade": s["grade"].value if s["grade"] else "unknown",
                  "quantity_kg": str(s["quantity_kg"]), "suggested_price_per_kg": r(rec.suggested_paise),
                  "range_per_kg": [r(rec.range_min_paise), r(rec.range_max_paise)], "market_reference_per_kg": r(rec.reference_paise),
                  "trend": rec.trend, "scope": rec.scope, "data_points": rec.data_points,

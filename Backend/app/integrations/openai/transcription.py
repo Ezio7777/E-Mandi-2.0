@@ -17,7 +17,7 @@ class OpenAITranscriber:
     def __init__(self, settings: Settings, client: Any | None = None) -> None:
         self.model, self.timeout = settings.OPENAI_TRANSCRIPTION_MODEL, settings.AI_PROVIDER_TIMEOUT_SECONDS
         key = settings.OPENAI_API_KEY.get_secret_value()
-        self.client = client or (AsyncOpenAI(api_key=key, timeout=self.timeout) if (key and self.model) else None)
+        self.client: Any = client or (AsyncOpenAI(api_key=key, timeout=self.timeout) if (key and self.model) else None)
 
     @property
     def available(self) -> bool:
@@ -31,9 +31,9 @@ class OpenAITranscriber:
             kwargs["language"] = language_hint
         try:
             resp = await asyncio.wait_for(self.client.audio.transcriptions.create(**kwargs), self.timeout)
-        except (TimeoutError, asyncio.TimeoutError) as exc:
+        except TimeoutError as exc:
             raise SpeechProviderError("timeout", self.name) from exc
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning("openai_transcription_failed", error_type=type(exc).__name__)
             raise SpeechProviderError("api_error", self.name) from exc
         text = getattr(resp, "text", None)
